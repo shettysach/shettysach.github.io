@@ -55,9 +55,11 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         let rel_path = src_path.strip_prefix(markdown_dir)?;
         let dst_path = html_dir.join(rel_path);
 
-        if src_path.extension().is_some_and(|ext| ext == "md")
-            && src_path.file_name().is_some_and(|i| i != "index.md")
-        {
+        if src_path.extension().is_some_and(|ext| ext == "md") {
+            if src_path.file_name().is_some_and(|i| i == "index.md") {
+                continue;
+            }
+
             let dst_path = dst_path.with_extension("html");
             let Metadata {
                 title,
@@ -77,17 +79,17 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
             // TODO: clean up implementation
             if let Some(tags) = tags {
-                let label_clone = label.clone(); // NOTE clone
                 if subtitle.is_some() {
                     writeln!(label, "<br>")?
                 };
+                let label_clone = label.clone(); // NOTE clone
                 for tag in tags {
-                    write!(label, "<a href=\"tags.html#{tag}\"><em>{tag}</em></a>, ",)?;
+                    writeln!(label, "<a href=\"tags.html#{tag}\"><em>{tag}</em></a>, ",)?;
                     tags_map.entry(tag).or_default().push(label_clone.clone()); // NOTE clone
                 }
             }
 
-            writeln!(index_html, "<li>{}</li>", label)?;
+            writeln!(index_html, "<li>{label}</li>")?;
         } else if src_path.is_dir() {
             fs::create_dir_all(dst_path)?; // Create parent directiories
         } else {
@@ -116,11 +118,12 @@ fn tags_page(tags_map: BTreeMap<String, Vec<String>>, tags_path: &Path) -> Resul
 
         article_html.push_str("<ul>\n");
         for label in labels {
-            writeln!(article_html, "<li>{}</li>", label)?;
+            writeln!(article_html, "<li>{label}</li>")?;
         }
-        article_html.push_str("</ul>\n");
+        article_html.push_str("</ul>\n<hr>\n");
     }
 
+    article_html.push_str(FOOTER);
     fs::write(tags_path, article_html)?;
 
     Ok(())

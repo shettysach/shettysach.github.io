@@ -12,36 +12,6 @@ These are some of my personal projects.
 
 ---
 
-## veNum
-
-[repo](https://github.com/shettysach/veNum)
-
-<pre class="ascii">
-               __
-__   _____  /\ \ \_   _ _ __ ___
-\ \ / / _ \/  \/ / | | | '_ ` _ \
- \ V /  __/ /\  /| |_| | | | | | |
-  \_/ \___\_\ \/  \__,_|_| |_| |_|
-</pre>
-
-- Stands for vectorized N-dimensional numerical arrays.
-- Tensor/ ndarray library.
-> NOTE: Work in progress. Needs refactoring and optimization.
-
-### Features:
-
-- Broadcasted algebraic operations.
-- nd matrix multiplication (naive).
-- 1d and 2d convolution/cross-correlation (naive) with strides.
-- Reduce operations such as sum, product, max, min and pooling.
-- Transformations such as view/reshape, permute/transpose, flip, expand, pad, slice, squeeze, unsqueeze.
-
-### Languages:
-
-- Rust
-
----
-
 ## ferrograd
 
 [repo](https://github.com/shettysach/ferrograd)
@@ -104,6 +74,29 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ---
 
+## Loxi
+
+[repo](https://github.com/shettysach/loxi),
+[wasm playground](https://shettysach.github.io/Loxi)
+
+<pre class="ascii">
+|\    /~\    / | 
+| \  /   \  /  | 
+|  \ \   / /   | 
+|     \ /  \   | 
+|     / \   \  | 
+|    /   \   \ | 
+</pre>
+
+- Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/).
+- Extend Lox with first-class lists and native functions for native functions for list operations.
+
+### Languages:
+
+- Odin
+
+---
+
 ## Kannada Handwriting Calculator
 
 [repo](https://github.com/shettysach/Kannada-Handwriting-Calculator)
@@ -135,6 +128,35 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ---
 
+## veNum
+
+[repo](https://github.com/shettysach/veNum)
+
+<pre class="ascii">
+               __
+__   _____  /\ \ \_   _ _ __ ___
+\ \ / / _ \/  \/ / | | | '_ ` _ \
+ \ V /  __/ /\  /| |_| | | | | | |
+  \_/ \___\_\ \/  \__,_|_| |_| |_|
+</pre>
+
+- Stands for vectorized N-dimensional numerical arrays.
+- Tensor/ ndarray library.
+
+### Features:
+
+- Broadcasted algebraic operations.
+- nd matrix multiplication (naive).
+- 1d and 2d convolution/cross-correlation (naive) with strides.
+- Reduce operations such as sum, product, max, min and pooling.
+- Transformations such as view/reshape, permute/transpose, flip, expand, pad, slice, squeeze, unsqueeze.
+
+### Languages:
+
+- Rust
+
+---
+
 ## Termfolio
 
 [repo](https://github.com/shettysach/Termfolio),
@@ -160,3 +182,21 @@ __   _____  /\ \ \_   _ _ __ ___
 
 - leptos, leptos-use
 - tokio, reqwest
+
+---
+
+## Liquid-Oxygen
+
+[repo](https://github.com/shettysach/Liquid-Oxygen),
+
+<pre class="ascii">
+        _____  _____  _     _ _____ ______       _____  _     _ __   __  ______ _______ __   _
+ |        |   |   __| |     |   |   |     \ ___ |     |  \___/    \_/   |  ____ |______ | \  |
+ |_____ __|__ |____\| |_____| __|__ |_____/     |_____| _/   \_    |    |_____| |______ |  \_|
+</pre>
+
+- Tree-walk interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html), based on the first half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/).
+
+### Languages:
+
+- Haskell

@@ -44,8 +44,6 @@
   --terminal-black: #414868;
   --editor-background-storm: #24283b;
   --editor-background-night: #1a1b26;
-
-  --horizontal-gap: 20%;
 }
 
 body {
@@ -61,7 +59,7 @@ body {
 
 main {
   flex: 1;
-  padding: 1rem var(--horizontal-gap);
+  padding: 1rem 20%;
   position: sticky;
   line-height: 1.5;
 }
@@ -69,7 +67,7 @@ main {
 header {
   background: var(--editor-background-storm);
   color: var(--variables-class-names);
-  padding: 1rem var(--horizontal-gap);
+  padding: 1rem 20%;
   position: sticky;
   z-index: 1000;
   font-size: 1.25rem;

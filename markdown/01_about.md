@@ -11,29 +11,21 @@ tags:
 
 ---
 
-## Current topics of interest
+Welcome to my blog. I am a MSCS student at USC, with interests in 
+- systems programming 
+- deep learning compilers 
+- programming language compilers 
 
-- Deep learning framework internals (JAX, PyTorch Tinygrad)
-- Transformers and LLMs
-- RAG, Knowledge Graphs
-- Deep symbolic regression
-- Functional programming
-- Compiler internals
-- WASM (WebAssembly)
+I am also interested in information theory, deep learning and category theory. I currently use Rust, Python, C++ and C. \
+My current operating system is NixOS - [[my config]](https://github.com/shettysach/nixos_config). 
 
-## Languages I currently use
+I aim to add more features to this blog and then articles and devlogs.
 
-- Rust
-- Python
-- C++
-- C
 
-## Languages I am interested in
+## [Projects](./02_projects.html)
 
-- OCaml
-- Haskell
-- Zig
+Click on the header link to be directed to the Projects article.
 
-## Current OS
+## Contact me
 
-❄️ NixOS [[my config]](https://github.com/shettysach/ice)
+- Mail - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com)

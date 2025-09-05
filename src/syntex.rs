@@ -38,7 +38,7 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                 }) => {
                     if let Some(id) = id {
                         anchored = true;
-                        let anchor = Event::Html(CowStr::from(format!("<a href=\"#{}\">", id)));
+                        let anchor = Event::Html(CowStr::from(format!("<a href=\"#{id}\">")));
                         events.push(anchor);
                     }
                     events.push(event);

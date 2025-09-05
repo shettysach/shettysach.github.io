@@ -1,9 +1,9 @@
 mod generate;
 mod syntex;
 mod utils;
-use std::path::Path;
 
 use anyhow::Result;
+use std::path::Path;
 
 fn main() -> Result<()> {
     let markdown_dir = Path::new("markdown");
