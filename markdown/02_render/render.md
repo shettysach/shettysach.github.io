@@ -9,7 +9,7 @@ tags:
 # Rendering math and highlighting code
 
 This section explains how the blog renders math and highlights syntax, using only static HTML and CSS.
-The code for this is located in the [`syntex`](https://github.com/shettysach/blog/blob/main/src/syntex.rs)
+The code for this is located in the [`syntex`](https://github.com/shettysach/shettysach.github.io/blob/main/src/syntex.rs)
 module, a portmanteau of syntax and TeX.
 
 ---
@@ -42,7 +42,7 @@ MathML Core is a subset with increased implementation details based on rules fro
 ```
 _MathML representation of the above equation_
 
-To convert from LaTeX to MathML, `pulldown-cmark` events are used to identify math and code sections. When `pulldown-cmark` parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown_latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is added to the output events vector and the math is rendered. 
+To convert from LaTeX to MathML, [`pulldown_cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math and code sections. When `pulldown-cmark` parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown_latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is added to the output events vector and the math is rendered. 
 
 Sum of cubes of the first $n$ natural numbers $\mathbb{N}$
 
@@ -75,7 +75,7 @@ $F(n)$, written as
 
   written as
     
-  ```console
+  ```tex
   $$
   F(n) =
   \begin{cases}
@@ -86,18 +86,6 @@ $F(n)$, written as
   $$
   ```
   
-  ````
-  ```math
-  F_{\text{head}}(n) =
-  \begin{cases}
-  0 & \text{if } n = 0, \\
-  1 & \text{if } n = 1, \\
-  F_{\text{head}}(n-1) +
-  F_{\text{head}}(n-2) & \text{if } n \geq 2.
-  \end{cases}
-  ```
-  ````
-    
 ---
 
 ## Highlighting code { #code }
@@ -120,9 +108,9 @@ to `cat`.
 When `pulldown-cmark` identifies a codeblock,
 `syntect` generates HTML with CSS classes for different code elements
 like keywords, variables and constants. This enables for syntax highlighting
-through CSS classes, which makes it easy to have colours assigned to different elements, 
-as implemented in 
-[`code.css`](https://github.com/shettysach/blog/tree/main/styles/code.css).
+through CSS classes, which makes it easy to have colours assigned to different elements.
+
+`syntect` also generates themes from `.tmTheme` files. This blog uses [`Enki-Tokyo-Night`](https://raw.githubusercontent.com/enkia/enki-theme/refs/heads/master/scheme/Enki-Tokyo-Night.tmTheme) from the [Enki Theme by enkia](https://github.com/enkia/enki-theme).
 
 ```html
 <pre><code><span class="source rust"><span class="meta function rust"><span class="meta function rust"><span class="storage type function rust">fn</span> </span><span class="entity name function rust">sum_of_cubes_lhs</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">(</span><span class="variable parameter rust">n</span><span class="punctuation separator rust">:</span> <span class="storage type rust">usize</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters end rust">)</span></span></span></span><span class="meta function rust"> <span class="meta function return-type rust"><span class="punctuation separator rust">-&gt;</span> <span class="storage type rust">usize</span></span> </span><span class="meta function rust"><span class="meta block rust"><span class="punctuation section block begin rust">{</span>

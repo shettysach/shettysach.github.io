@@ -3,7 +3,11 @@ mod syntex;
 mod utils;
 
 use anyhow::Result;
-use std::path::Path;
+use std::{fs, path::Path};
+use syntect::{
+    highlighting::ThemeSet,
+    html::{ClassStyle, css_for_theme_with_class_style},
+};
 
 fn main() -> Result<()> {
     let markdown_dir = Path::new("markdown");
@@ -12,6 +16,10 @@ fn main() -> Result<()> {
 
     generate::index_page(markdown_dir, html_dir)?;
     utils::copy_directory(styles_dir, html_dir)?;
+
+    let theme = &ThemeSet::load_from_folder(styles_dir.join("css"))?.themes["Enki-Tokyo-Night"];
+    let code_css = css_for_theme_with_class_style(theme, ClassStyle::Spaced)?;
+    fs::write(html_dir.join("css").join("code.css"), code_css)?;
 
     Ok(())
 }

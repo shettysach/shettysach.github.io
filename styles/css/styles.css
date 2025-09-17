@@ -51,6 +51,14 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--editor-background-night);
+  background-image:
+    linear-gradient(rgba(26, 27, 38, 0.85), rgba(26, 27, 38, 0.85)),
+    url("https://images.unsplash.com/photo-1628818144466-856f7d477125?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D");
+
+  background-size: cover;         /* scale image to cover viewport */
+  background-position: center;    /* center the image */
+  background-repeat: no-repeat;   /* no tiling */
+  background-attachment: fixed;   /* optional: parallax-like */
   color: var(--variables-class-names);
   display: flex;
   flex-direction: column;
@@ -65,7 +73,8 @@ main {
 }
 
 header {
-  background: var(--editor-background-storm);
+  /* background: var(--editor-background-storm); */
+  background: rgba(36, 40, 59, 0.5);
   color: var(--variables-class-names);
   padding: 1rem 20%;
   position: sticky;
@@ -74,7 +83,8 @@ header {
 }
 
 footer {
-  background: var(--editor-background-storm);
+  /* background: var(--editor-background-storm); */
+  background: rgba(36, 40, 59, 0.5);
   color: var(--variables-class-names);
   text-align: center;
   padding: 1rem;
@@ -89,7 +99,6 @@ header nav {
   display: flex;
   gap: 2rem;
   align-items: center;
-  background: var(--editor-background-storm);
 }
 
 header nav ul {
@@ -130,7 +139,7 @@ p {
 
 pre {
   font-family: "JetBrains Mono", monospace;
-  background-color: var(--editor-background-storm);
+  background-color: rgba(36, 40, 59, 0.5);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
@@ -162,7 +171,6 @@ span code {
 pre code {
   white-space: pre;
   Display: block;
-  background: inherit;
 }
 
 blockquote {
@@ -203,6 +211,10 @@ a:hover {
 
 img {
     max-width: 100%;
+}
+
+.class {
+    color: var(--object-literal-keys); 
 }
 
 @media (max-width: 768px) {
