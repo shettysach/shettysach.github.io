@@ -1,15 +1,10 @@
 use anyhow::{Context, Result};
-use pulldown_cmark::{Options, Parser, html};
-use std::{
-    collections::BTreeMap,
-    fmt::Write,
-    fs,
-    path::{Path, PathBuf},
-};
+use pulldown_cmark::{Event, Options, Parser, html};
+use std::{collections::BTreeMap, fmt::Write, fs, path::Path};
 use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
-use crate::syntex::{Article, Metadata, Syntex};
+use crate::syntex::Syntex;
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
@@ -18,18 +13,33 @@ const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_MATH)
     .union(Options::ENABLE_HEADING_ATTRIBUTES);
 
-struct ArticleInfo {
-    title: String,
-    subtitle: Option<String>,
-    tags: Option<Vec<String>>,
-    link: PathBuf,
+pub(crate) struct Article<'a> {
+    pub(crate) metadata: Metadata,
+    pub(crate) events: Vec<Event<'a>>,
 }
 
-impl ArticleInfo {
-    fn render_label(&self) -> String {
+pub(crate) struct Metadata {
+    pub(crate) title: String,
+    pub(crate) subtitle: Option<String>,
+    pub(crate) tags: Option<Vec<String>>,
+}
+
+impl Metadata {
+    fn generate_header(&self) -> String {
+        HEADER.replace("{{TITLE}}", &self.title).replace(
+            "{{DESCRIPTION}}",
+            self.subtitle.as_deref().unwrap_or("Blogpost"),
+        )
+    }
+
+    fn generate_tag(&self, tag: &str) -> String {
+        format!("<a href=\"tags.html#{tag}\"><em>{tag}</em></a>")
+    }
+
+    fn render_label(&self, link: &Path) -> String {
         let mut label = format!(
             "<h2><a href=\"{}\">{}</a></h2>",
-            self.link.to_string_lossy(),
+            link.to_string_lossy(),
             self.title
         );
 
@@ -40,17 +50,20 @@ impl ArticleInfo {
         label
     }
 
-    fn render_with_tags(&self) -> String {
-        let mut label = self.render_label();
+    fn render_with_tags(&self, link: &Path) -> String {
+        let mut label = self.render_label(link);
 
         if let Some(ref tags) = self.tags {
             if self.subtitle.is_some() {
                 label.push_str("<br>");
             }
 
-            for tag in tags {
-                label.push_str(&format!("<a href=\"tags.html#{tag}\"><em>{tag}</em></a>, "));
+            for tag in &tags[..tags.len() - 1] {
+                label.push_str(&self.generate_tag(tag));
+                label.push_str(", ");
             }
+            let tag = &tags[tags.len() - 1];
+            label.push_str(&self.generate_tag(tag));
         }
 
         label
@@ -72,7 +85,7 @@ fn render_markdown(src: &Path, dst: &Path, syntax_set: &SyntaxSet) -> Result<Met
     }
 
     let mut page = String::with_capacity(HEADER.len() + markdown.len() + FOOTER.len());
-    page.push_str(HEADER);
+    page.push_str(&metadata.generate_header());
     html::push_html(&mut page, events.into_iter());
     page.push_str(FOOTER);
 
@@ -85,7 +98,6 @@ fn render_markdown(src: &Path, dst: &Path, syntax_set: &SyntaxSet) -> Result<Met
 pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let syntax_set = SyntaxSet::load_defaults_newlines();
     let mut tags_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut articles = Vec::new();
 
     // Process index.md
     let index_md =
@@ -96,7 +108,15 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         .context("Failed to process index.md")?
         .events;
 
-    // Collect and process all markdown files
+    let mut index_html = String::new();
+    index_html.push_str(
+        &HEADER
+            .replace("{{TITLE}}", "Sachith Shetty")
+            .replace("{{DESCRIPTION}}", "Welcome to my website"),
+    );
+    html::push_html(&mut index_html, index_events.into_iter());
+    index_html.push_str("<ul>\n");
+
     for entry in WalkDir::new(markdown_dir)
         .max_depth(2)
         .sort_by_file_name()
@@ -108,64 +128,44 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         let dst_path = html_dir.join(rel_path);
 
         match src_path {
-            path if path.extension().map_or(false, |ext| ext == "md") => {
-                if path.file_name().map_or(false, |name| name == "index.md") {
+            path if path.extension().is_some_and(|ext| ext == "md") => {
+                if path.file_name().is_some_and(|name| name == "index.md") {
                     continue;
                 }
 
                 let html_dst = dst_path.with_extension("html");
                 let metadata = render_markdown(path, &html_dst, &syntax_set)?;
+                let link = rel_path.with_extension("html");
 
-                let article = ArticleInfo {
-                    title: metadata.title,
-                    subtitle: metadata.subtitle,
-                    tags: metadata.tags,
-                    link: rel_path.with_extension("html"),
-                };
+                // Add to index HTML
+                let label_with_tags = metadata.render_with_tags(&link);
+                writeln!(index_html, "<li>{}</li>", label_with_tags)?;
 
-                articles.push(article);
+                // Populate tags map
+                if let Some(ref tags) = metadata.tags {
+                    let base_label = metadata.render_label(&link);
+                    for tag in tags {
+                        tags_map
+                            .entry(tag.clone())
+                            .or_default()
+                            .push(base_label.clone());
+                    }
+                }
             }
             path if path.is_dir() => {
-                fs::create_dir_all(&dst_path).with_context(|| {
-                    format!("Failed to create directory: {}", dst_path.display())
-                })?;
+                fs::create_dir_all(&dst_path).with_context(|| "Failed to create _site dir")?
             }
-            _ => {
-                fs::copy(src_path, dst_path)
-                    .with_context(|| format!("Failed to copy file: {}", src_path.display()))?;
-            }
-        }
-    }
-
-    // Build index HTML and tags map
-    let mut index_html = String::with_capacity(
-        HEADER.len() + FOOTER.len() + articles.len() * 200, // rough estimate
-    );
-    index_html.push_str(HEADER);
-    html::push_html(&mut index_html, index_events.into_iter());
-    index_html.push_str("<ul>\n");
-
-    for article in &articles {
-        let label_with_tags = article.render_with_tags();
-        writeln!(index_html, "<li>{}</li>", label_with_tags)?;
-
-        // Populate tags map
-        if let Some(ref tags) = article.tags {
-            let base_label = article.render_label();
-            for tag in tags {
-                tags_map
-                    .entry(tag.clone())
-                    .or_default()
-                    .push(base_label.clone());
-            }
+            _ => fs::copy(src_path, dst_path)
+                .with_context(|| format!("Failed to copy file: {}", src_path.display()))
+                .map(|_| {})?,
         }
     }
 
     index_html.push_str("</ul>\n");
     index_html.push_str(FOOTER);
 
-    // Write files
-    fs::write(html_dir.join("index.html"), index_html).context("Failed to write index.html")?;
+    fs::write(html_dir.join("index.html"), index_html)
+        .with_context(|| "Failed to write index.html")?;
 
     tags_page(tags_map, &html_dir.join("tags.html"))?;
 

@@ -1,5 +1,6 @@
 ---
 title: Projects
+subtitle: Page to display my personal projects
 tags:
   - about
   - rust
@@ -24,9 +25,9 @@ These are some of my personal projects.
                       |___|
 </pre>
 
-- A small scalar autograd engine / Rust library, inspired by Karpathy's `micrograd`, with more features such as implementations of extra activation functions, optimizers, loss criterions, and accuracy metrics.
-- Capable of MNIST classification with an example implemented using the library.
-- Capable of creating neurons, dense layers, and multilayer perceptrons (MLPs) for binary and multiclass/multilabel non-linear classification.
+- A small scalar autograd engine / Rust library, inspired by Karpathy's `micrograd`, with more features such as implementations of extra activation functions, optimizers, loss criterions, and accuracy metrics
+- Capable of MNIST classification with an example implemented using the library
+- Capable of creating neurons, dense layers, and multilayer perceptrons (MLPs) for binary and multiclass/multilabel non-linear classification
 
 ### Features:
 
@@ -56,10 +57,10 @@ These are some of my personal projects.
   \___\__,_|_||_\__,_|_\___|_|  |_|_/__/\__|
 </pre>
 
-- A fullstack chatbot built using Rust for both the frontend and the backend.
-- Utilizes quantized Mistral 7B Instruct v0.1 GGUF models.
-- Built with Hugging Face's Candle framework, which includes the `candle_transformers` crate for LLM inferencing.
-- Employs Tokio and Actix for asynchronous functionality in the backend, alongside Leptos and TailwindCSS for the frontend.
+- A fullstack chatbot built using Rust for both the frontend and the backend
+- Utilizes quantized Mistral 7B Instruct v0.1 GGUF models
+- Built with Hugging Face's Candle framework, which includes the `candle_transformers` crate for LLM inferencing
+- Employs Tokio and Actix for asynchronous functionality in the backend, alongside Leptos and TailwindCSS for the frontend
 
 ### Languages:
 
@@ -88,8 +89,8 @@ These are some of my personal projects.
 |    /   \   \ | 
 </pre>
 
-- Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/).
-- Extend Lox with first-class lists and native functions for native functions for list operations.
+- Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
+- Extend Lox with first-class lists and native functions for native functions for list operations
 
 ### Languages:
 
@@ -103,13 +104,13 @@ These are some of my personal projects.
 
 ![demo](https://raw.githubusercontent.com/shettysach/Kannada-Handwriting-Calculator/refs/heads/main/assets/Demo.gif)
 
-- A calculator that uses handwritten Kannada digits and operators to calculate the result, using contour detection and CNN/ConvNet/Convolutional Neural Network model prediction.
-- PyTorch is used to create, train and load the state of the neural network model used for predictions.
-- The CNN is trained on Kannada MNIST.
-- OpenCV and Pillow (PIL) are used to read input from the GUI canvas and to obtain contours for individual digits/operators.
-- CustomTKinter is used to provide the GUI.
-- The individual digits/operators are detected and their most probable target classes are predicted.
-- The predictions are combined into a string and evaluated to get the result.
+- A calculator that uses handwritten Kannada digits and operators to calculate the result, using contour detection and CNN/ConvNet/Convolutional Neural Network model prediction
+- PyTorch is used to create, train and load the state of the neural network model used for predictions
+- The CNN is trained on Kannada MNIST
+- OpenCV and Pillow (PIL) are used to read input from the GUI canvas and to obtain contours for individual digits/operators
+- CustomTKinter is used to provide the GUI
+- The individual digits/operators are detected and their most probable target classes are predicted
+- The predictions are combined into a string and evaluated to get the result
 
 ### Languages:
 
@@ -140,16 +141,16 @@ __   _____  /\ \ \_   _ _ __ ___
   \_/ \___\_\ \/  \__,_|_| |_| |_|
 </pre>
 
-- Stands for vectorized N-dimensional numerical arrays.
-- Tensor/ ndarray library.
+- Stands for vectorized N-dimensional numerical arrays
+- Tensor/ ndarray library
 
 ### Features:
 
-- Broadcasted algebraic operations.
-- nd matrix multiplication (naive).
-- 1d and 2d convolution/cross-correlation (naive) with strides.
-- Reduce operations such as sum, product, max, min and pooling.
-- Transformations such as view/reshape, permute/transpose, flip, expand, pad, slice, squeeze, unsqueeze.
+- Broadcasted algebraic operations
+- nd matrix multiplication (naive)
+- 1d and 2d convolution/cross-correlation (naive) with strides
+- Reduce operations such as sum, product, max, min and pooling
+- Transformations such as view/reshape, permute/transpose, flip, expand, pad, slice, squeeze, unsqueeze
 
 ### Languages:
 
@@ -169,8 +170,8 @@ __   _____  /\ \ \_   _ _ __ ___
 /_/ /___/_/|_/_/  /_/_/  \____/____/___/\____/
 </pre>
 
-- Terminal style portfolio website, built using the Leptos framework, for Rust WASM.
-- Customizable and configurable using JSON.
+- Terminal style portfolio website, built using the Leptos framework, for Rust WASM
+- Customizable and configurable using JSON
 - Work in progress
 
 ### Languages:
@@ -185,9 +186,23 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ---
 
+## Cohle
+
+[repo](https://github.com/shettysach/Cohle)
+
+![img](https://raw.githubusercontent.com/shettysach/cohle/refs/heads/master/image.png)
+
+- Rust CLI that prints Rust Cohle quotes
+
+### Languages:
+
+- Haskell
+
+---
+
 ## Liquid-Oxygen
 
-[repo](https://github.com/shettysach/Liquid-Oxygen),
+[repo](https://github.com/shettysach/Liquid-Oxygen)
 
 <pre class="ascii">
         _____  _____  _     _ _____ ______       _____  _     _ __   __  ______ _______ __   _
@@ -195,7 +210,7 @@ __   _____  /\ \ \_   _ _ __ ___
  |_____ __|__ |____\| |_____| __|__ |_____/     |_____| _/   \_    |    |_____| |______ |  \_|
 </pre>
 
-- Tree-walk interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html), based on the first half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/).
+- Tree-walk interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html), based on the first half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
 
 ### Languages:
 

@@ -1,5 +1,6 @@
 ---
-title: Index
+title: shettysach.github.io
+subtitle: Welcome to my website
 ---
 
 # Welcome

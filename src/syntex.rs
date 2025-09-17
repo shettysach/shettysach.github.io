@@ -1,3 +1,4 @@
+use crate::generate::{Article, Metadata};
 use anyhow::{Error, Result};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Tag, TagEnd};
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
@@ -101,17 +102,6 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
             .map(|metadata| Article { metadata, events })
             .ok_or_else(|| Error::msg("Metadata error"))
     }
-}
-
-pub(crate) struct Article<'a> {
-    pub(crate) metadata: Metadata,
-    pub(crate) events: Vec<Event<'a>>,
-}
-
-pub(crate) struct Metadata {
-    pub(crate) title: String,
-    pub(crate) subtitle: Option<String>,
-    pub(crate) tags: Option<Vec<String>>,
 }
 
 fn latex_to_mathml(
