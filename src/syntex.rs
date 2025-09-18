@@ -112,7 +112,6 @@ fn latex_to_mathml(
     let mut mathml = String::new();
     let parser = pulldown_latex::Parser::new(latex, storage);
 
-    // NOTE: Replace with consts?
     let config = RenderConfig {
         display_mode,
         ..Default::default()

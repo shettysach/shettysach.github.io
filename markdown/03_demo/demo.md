@@ -2,10 +2,8 @@
 title: Demo
 subtitle: A post to demonstrate the blog's features.
 tags:
-  - markdown
-  - about
-  - demo
-  - test
+  - Markdown
+  - Blog
 ---
 
 # Demonstration
@@ -74,19 +72,35 @@ $$
 
 Code blocks are highlighted using syntax-aware rendering. Specify the language for proper highlighting.
 
-### Rust Example
 
 ```rust
-fn main() {
-    println!("Hello, blog!");
+fn sum_of_squares(xs: &[i32]) -> i32 {
+    xs.iter().map(|&x| x * x).sum()
 }
 ```
 
-### Python Example
+```cpp
+#include <type_traits>
+
+template <int N>
+struct Fib : std::integral_constant<long long, Fib<N - 1>::value + Fib<N - 2>::value> {};
+template <>
+struct Fib<1> : std::integral_constant<long long, 1> {};
+template <>
+struct Fib<0> : std::integral_constant<long long, 0> {};
+```
 
 ```python
-def greet():
-    print("Hello, blog!")
+def evens_squared(nums: list[int]) -> list[int]:
+    return [n * n for n in nums if n % 2 == 0]
+```
+
+```haskell
+data Tree v = Leaf v | Node (Maybe (Tree v)) v (Maybe (Tree v))
+
+invert :: Tree v -> Tree v
+invert (Node l v r) = Node (invert <$> r) v (invert <$> l)
+invert (Leaf v)     = Leaf v
 ```
 
 ## Links and Images

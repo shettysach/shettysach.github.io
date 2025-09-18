@@ -1,5 +1,5 @@
 ---
-title: shettysach.github.io
+title: Home
 subtitle: Welcome to my website
 ---
 
@@ -33,9 +33,8 @@ You can can contact me via email - [shettysachith47@gmail.com](mailto:shettysach
 
 ---
 
-This blog is built with 
-[pulldown_cmark](https://crates.io/crates/pulldown-cmark), 
-[pulldown_latex](https://crates.io/crates/pulldown-latex) and
-[syntect](https://crates.io/crates/syntect). It uses static HTML and CSS.\
+This blog is built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and
+[syntect](https://crates.io/crates/syntect). 
+It uses static HTML and CSS, generated from Markdown. 
 I aim to add more features to this blog and then articles and devlogs.
 

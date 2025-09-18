@@ -26,10 +26,12 @@ pub(crate) struct Metadata {
 
 impl Metadata {
     fn generate_header(&self) -> String {
-        HEADER.replace("{{TITLE}}", &self.title).replace(
-            "{{DESCRIPTION}}",
-            self.subtitle.as_deref().unwrap_or("Blogpost"),
-        )
+        let title = format!("{} | Sachith Shetty", self.title);
+        let description = self.subtitle.as_deref().unwrap_or("Blogpost");
+
+        HEADER
+            .replace("{{TITLE}}", &title)
+            .replace("{{DESCRIPTION}}", description)
     }
 
     fn generate_tag(&self, tag: &str) -> String {
@@ -103,18 +105,13 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md =
         fs::read_to_string(markdown_dir.join("index.md")).context("Failed to read index.md")?;
 
-    let index_events = Parser::new_ext(&index_md, OPTIONS)
+    let Article { metadata, events } = Parser::new_ext(&index_md, OPTIONS)
         .process(&syntax_set)
-        .context("Failed to process index.md")?
-        .events;
+        .context("Failed to process index.md")?;
 
     let mut index_html = String::new();
-    index_html.push_str(
-        &HEADER
-            .replace("{{TITLE}}", "Sachith Shetty")
-            .replace("{{DESCRIPTION}}", "Welcome to my website"),
-    );
-    html::push_html(&mut index_html, index_events.into_iter());
+    index_html.push_str(&metadata.generate_header());
+    html::push_html(&mut index_html, events.into_iter());
     index_html.push_str("<ul>\n");
 
     for entry in WalkDir::new(markdown_dir)
@@ -127,37 +124,34 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         let rel_path = src_path.strip_prefix(markdown_dir)?;
         let dst_path = html_dir.join(rel_path);
 
-        match src_path {
-            path if path.extension().is_some_and(|ext| ext == "md") => {
-                if path.file_name().is_some_and(|name| name == "index.md") {
-                    continue;
-                }
+        if src_path.extension().is_some_and(|ext| ext == "md") {
+            if src_path.file_name().is_some_and(|name| name == "index.md") {
+                continue;
+            }
 
-                let html_dst = dst_path.with_extension("html");
-                let metadata = render_markdown(path, &html_dst, &syntax_set)?;
-                let link = rel_path.with_extension("html");
+            let html_dst = dst_path.with_extension("html");
+            let metadata = render_markdown(src_path, &html_dst, &syntax_set)?;
+            let link = rel_path.with_extension("html");
 
-                // Add to index HTML
-                let label_with_tags = metadata.render_with_tags(&link);
-                writeln!(index_html, "<li>{}</li>", label_with_tags)?;
+            // Add to index HTML
+            let label_with_tags = metadata.render_with_tags(&link);
+            writeln!(index_html, "<li>{}</li>", label_with_tags)?;
 
-                // Populate tags map
-                if let Some(ref tags) = metadata.tags {
-                    let base_label = metadata.render_label(&link);
-                    for tag in tags {
-                        tags_map
-                            .entry(tag.clone())
-                            .or_default()
-                            .push(base_label.clone());
-                    }
+            // Populate tags map
+            if let Some(ref tags) = metadata.tags {
+                for tag in tags {
+                    tags_map
+                        .entry(tag.clone())
+                        .or_default()
+                        .push(metadata.render_label(&link));
                 }
             }
-            path if path.is_dir() => {
-                fs::create_dir_all(&dst_path).with_context(|| "Failed to create _site dir")?
-            }
-            _ => fs::copy(src_path, dst_path)
+        } else if src_path.is_dir() {
+            fs::create_dir_all(&dst_path).with_context(|| "Failed to create _site dir")?
+        } else {
+            fs::copy(src_path, dst_path)
                 .with_context(|| format!("Failed to copy file: {}", src_path.display()))
-                .map(|_| {})?,
+                .map(|_| {})?
         }
     }
 
@@ -176,13 +170,17 @@ fn tags_page(tags_map: BTreeMap<String, Vec<String>>, tags_path: &Path) -> Resul
     let estimated_size = tags_map.len() * 300 + HEADER.len() + FOOTER.len();
     let mut article_html = String::with_capacity(estimated_size);
 
-    article_html.push_str(HEADER);
+    article_html.push_str(
+        &HEADER
+            .replace("{{TITLE}}", "Tags")
+            .replace("{{DESCRIPTION}}", "Page for tagged articles"),
+    );
     article_html.push_str("<h1>Tags</h1>\n<hr>\n");
 
     for (tag, labels) in tags_map {
         writeln!(
             article_html,
-            "<h2 id=\"{tag}\"><a href=\"#{tag}\"><em>{tag}</em></a></h2>"
+            "<h3 id=\"{tag}\"><a href=\"#{tag}\"><em>{tag}</em></a></h3>"
         )?;
 
         article_html.push_str("<ul>\n");

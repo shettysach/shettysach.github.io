@@ -50,7 +50,7 @@ body {
   font-family: "Lora", serif;
   margin: 0;
   padding: 0;
-  /* background-color: var(--editor-background-night); */
+  background-color: var(--editor-background-night);
   background-image:
     linear-gradient(rgba(26, 27, 38, 0.75), rgba(26, 27, 38, 0.75)),
     url("../assets/background.avif");

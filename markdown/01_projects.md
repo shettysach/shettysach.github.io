@@ -2,9 +2,10 @@
 title: Projects
 subtitle: Page to display my personal projects
 tags:
-  - about
-  - rust
-  - python
+  - Rust
+  - Python
+  - Odin
+  - Haskell
 ---
 
 # Projects
@@ -172,7 +173,6 @@ __   _____  /\ \ \_   _ _ __ ___
 
 - Terminal style portfolio website, built using the Leptos framework, for Rust WASM
 - Customizable and configurable using JSON
-- Work in progress
 
 ### Languages:
 
