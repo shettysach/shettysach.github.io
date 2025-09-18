@@ -7,7 +7,7 @@ subtitle: Welcome to my website
 
 ---
 
-Hi, I'm Sachith, an MSCS student at USC, with interests in 
+Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in 
 - systems programming 
 - deep learning compilers 
 - programming language compilers 
