@@ -17,7 +17,7 @@ I like configurable operating systems and mostly use Linux distros. My current O
 
 Here are some of my personal projects. For more detail, read this [article](./01_projects.html).
 
-- [Loxi](Loxi) - Bytecode interpreter for Lox written in Odin, extended with support for Python-like lists 
+- [Loxi](Loxi) - Bytecode interpreter for Lox written in Odin, extended with support for Python-like lists and a web playground 
 - [Ferrograd](https://www.github.com/shettysach/Ferrograd) - Small scalar autograd engine, inspired from Karpathy's micrograd
 - [Kannada-Handwriting-Calculator](https://www.github.com/shettysach/Kannada-Handwriting-Calculator) - Calculator that uses handwritten Kannada digits, powered by a CNN model
 - [CandleMist](https://www.github.com/shettysach/CandleMist) - Full‑stack, local‑inference chatbot powered by Mistral 7B Instruct (GGUF) using the Candle framework 
@@ -26,8 +26,7 @@ Here are some of my personal projects. For more detail, read this [article](./01
 - [Liquid-Oxygen](https://www.github.com/shettysach/Liquid-Oxygen) - Tree-walk interpreter for Lox written in Haskell
 - [Cohle](https://www.github.com/shettysach/cohle) - Rust CLI that prints Rust Cohle quotes
 
-You can visit my [GitHub](https://www.github.com/shettysach) and [LinkedIn](https://www.linkedin.com/in/sachithshetty314/). 
-You can can contact me via email - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com)
+You can visit my [GitHub](https://www.github.com/shettysach) and [LinkedIn](https://www.linkedin.com/in/sachithshetty314/) and contact me via email - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com)
 
 # Articles
 
