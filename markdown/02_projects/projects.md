@@ -160,7 +160,7 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ![ss](./term.png)
 
-- Terminal style portfolio website, built using the Leptos framework, for Rust WASM
+- Terminal style portfolio website, built using the Leptos framework for Rust WASM
 - Customizable and configurable using JSON
 
 ### Languages:
@@ -194,9 +194,10 @@ __   _____  /\ \ \_   _ _ __ ___
 [repo](https://github.com/shettysach/Liquid-Oxygen)
 
 <pre class="ascii">
-        _____  _____  _     _ _____ ______       _____  _     _ __   __  ______ _______ __   _
- |        |   |   __| |     |   |   |     \ ___ |     |  \___/    \_/   |  ____ |______ | \  |
- |_____ __|__ |____\| |_____| __|__ |_____/     |_____| _/   \_    |    |_____| |______ |  \_|
+_    _ ____ _  _ _ ___     ____ _  _ _   _ ____ ____ _  _ 
+|    | |  | |  | | |  \ __ |  |  \/   \_/  | __ |___ |\ | 
+|___ | |_\| |__| | |__/    |__| _/\_   |   |__] |___ | \| 
+                                                          
 </pre>
 
 - Tree-walk interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html), based on the first half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)

@@ -9,7 +9,7 @@ subtitle: Welcome to my website
 
 Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers and programming language compilers. I am also interested in learning about information theory, deep learning and functional programming. I currently use Rust, Python, C++ and C.
 
-Here are some of my personal projects. For more detail, read this [article](./01_projects.html).
+Here are some of my personal projects. For more detail, read this [article](./02_projects/projects.html).
 
 - [Loxi](Loxi) - Bytecode interpreter for Lox written in Odin, extended with support for lists and a web playground 
 - [Ferrograd](https://www.github.com/shettysach/Ferrograd) - Small scalar autograd engine, inspired from Karpathy's micrograd
