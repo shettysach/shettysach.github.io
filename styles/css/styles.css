@@ -50,16 +50,19 @@ body {
   font-family: "Lora", serif;
   margin: 0;
   padding: 0;
+
   background-color: var(--editor-background-night);
+
   background-image:
     linear-gradient(rgba(26, 27, 38, 0.75), rgba(26, 27, 38, 0.75)),
     url("../assets/background.avif");
-
   background-size: cover;         /* scale image to cover viewport */
   background-position: center;    /* center the image */
   background-repeat: no-repeat;   /* no tiling */
   background-attachment: fixed;   /* optional: parallax-like */
+
   color: var(--variables-class-names);
+
   display: flex;
   flex-direction: column;
   min-height: 100vh;

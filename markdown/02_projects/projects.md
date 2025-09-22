@@ -1,6 +1,6 @@
 ---
 title: Projects
-subtitle: Page to display my personal projects
+subtitle: A post to display my personal projects
 tags:
   - Rust
   - Python
@@ -11,6 +11,22 @@ tags:
 # Projects
 
 These are some of my personal projects.
+
+---
+
+## Loxi
+
+[repo](https://github.com/shettysach/loxi),
+[wasm playground](https://shettysach.github.io/Loxi)
+
+![loxi](./loxi.png)
+
+- Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
+- Extend Lox with first-class lists and native functions for native functions for list operations
+
+### Languages:
+
+- Odin
 
 ---
 
@@ -45,6 +61,37 @@ These are some of my personal projects.
 
 ---
 
+## Kannada Handwriting Calculator
+
+[repo](https://github.com/shettysach/Kannada-Handwriting-Calculator)
+
+![demo](https://raw.githubusercontent.com/shettysach/Kannada-Handwriting-Calculator/refs/heads/main/assets/Demo.gif)
+
+- A calculator that uses handwritten Kannada digits and operators to calculate the result, using contour detection and CNN/ConvNet/Convolutional Neural Network model prediction
+- PyTorch is used to create, train and load the state of the neural network model used for predictions
+- The CNN is trained on Kannada MNIST
+- OpenCV and Pillow (PIL) are used to read input from the GUI canvas and to obtain contours for individual digits/operators
+- CustomTKinter is used to provide the GUI
+- The individual digits/operators are detected and their most probable target classes are predicted
+- The predictions are combined into a string and evaluated to get the result
+
+### Languages:
+
+- Python
+
+### Modules:
+
+- pytorch, torchvision
+- opencv
+- numpy, pandas
+- customtkinter
+
+### Tools:
+
+- conda, jupyter
+
+---
+
 ## CandleMist
 
 [repo](https://github.com/shettysach/CandleMist)
@@ -74,59 +121,6 @@ These are some of my personal projects.
 - tokio, actix
 - leptos, tailwind
 
----
-
-## Loxi
-
-[repo](https://github.com/shettysach/loxi),
-[wasm playground](https://shettysach.github.io/Loxi)
-
-<pre class="ascii">
-|\    /~\    / | 
-| \  /   \  /  | 
-|  \ \   / /   | 
-|     \ /  \   | 
-|     / \   \  | 
-|    /   \   \ | 
-</pre>
-
-- Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
-- Extend Lox with first-class lists and native functions for native functions for list operations
-
-### Languages:
-
-- Odin
-
----
-
-## Kannada Handwriting Calculator
-
-[repo](https://github.com/shettysach/Kannada-Handwriting-Calculator)
-
-![demo](https://raw.githubusercontent.com/shettysach/Kannada-Handwriting-Calculator/refs/heads/main/assets/Demo.gif)
-
-- A calculator that uses handwritten Kannada digits and operators to calculate the result, using contour detection and CNN/ConvNet/Convolutional Neural Network model prediction
-- PyTorch is used to create, train and load the state of the neural network model used for predictions
-- The CNN is trained on Kannada MNIST
-- OpenCV and Pillow (PIL) are used to read input from the GUI canvas and to obtain contours for individual digits/operators
-- CustomTKinter is used to provide the GUI
-- The individual digits/operators are detected and their most probable target classes are predicted
-- The predictions are combined into a string and evaluated to get the result
-
-### Languages:
-
-- Python
-
-### Modules:
-
-- pytorch, torchvision
-- opencv
-- numpy, pandas
-- customtkinter
-
-### Tools:
-
-- conda, jupyter
 
 ---
 
@@ -164,12 +158,7 @@ __   _____  /\ \ \_   _ _ __ ___
 [repo](https://github.com/shettysach/Termfolio),
 [page](https://shettysach.github.io/Termfolio)
 
-<pre class="ascii">
- _____________  __  ___________  __   ________
-/_  __/ __/ _ \/  |/  / __/ __ \/ /  /  _/ __ \
- / / / _// , _/ /|_/ / _// /_/ / /___/ // /_/ /
-/_/ /___/_/|_/_/  /_/_/  \____/____/___/\____/
-</pre>
+![ss](./term.png)
 
 - Terminal style portfolio website, built using the Leptos framework, for Rust WASM
 - Customizable and configurable using JSON

@@ -26,16 +26,12 @@ pub(crate) struct Metadata {
 
 impl Metadata {
     fn generate_header(&self) -> String {
-        let title = format!("{} | Sachith Shetty", self.title);
-        let description = self.subtitle.as_deref().unwrap_or("Blogpost");
-
         HEADER
-            .replace("{{TITLE}}", &title)
-            .replace("{{DESCRIPTION}}", description)
-    }
-
-    fn generate_tag(&self, tag: &str) -> String {
-        format!("<a href=\"tags.html#{tag}\"><em>{tag}</em></a>")
+            .replace("{{TITLE}}", &format!("{} | Sachith Shetty", self.title))
+            .replace(
+                "{{DESCRIPTION}}",
+                self.subtitle.as_deref().unwrap_or("Blogpost"),
+            )
     }
 
     fn render_label(&self, link: &Path) -> String {
@@ -47,25 +43,6 @@ impl Metadata {
 
         if let Some(ref subtitle) = self.subtitle {
             label.push_str(subtitle);
-        }
-
-        label
-    }
-
-    fn render_with_tags(&self, link: &Path) -> String {
-        let mut label = self.render_label(link);
-
-        if let Some(ref tags) = self.tags {
-            if self.subtitle.is_some() {
-                label.push_str("<br>");
-            }
-
-            for tag in &tags[..tags.len() - 1] {
-                label.push_str(&self.generate_tag(tag));
-                label.push_str(", ");
-            }
-            let tag = &tags[tags.len() - 1];
-            label.push_str(&self.generate_tag(tag));
         }
 
         label
@@ -86,7 +63,7 @@ fn render_markdown(src: &Path, dst: &Path, syntax_set: &SyntaxSet) -> Result<Met
             .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
     }
 
-    let mut page = String::with_capacity(HEADER.len() + markdown.len() + FOOTER.len());
+    let mut page = String::with_capacity(HEADER.len() + FOOTER.len() + markdown.len() * 2);
     page.push_str(&metadata.generate_header());
     html::push_html(&mut page, events.into_iter());
     page.push_str(FOOTER);
@@ -109,7 +86,7 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         .process(&syntax_set)
         .context("Failed to process index.md")?;
 
-    let mut index_html = String::new();
+    let mut index_html = String::with_capacity(HEADER.len() + FOOTER.len() + index_md.len() * 2);
     index_html.push_str(&metadata.generate_header());
     html::push_html(&mut index_html, events.into_iter());
     index_html.push_str("<ul>\n");
@@ -133,19 +110,24 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             let metadata = render_markdown(src_path, &html_dst, &syntax_set)?;
             let link = rel_path.with_extension("html");
 
-            // Add to index HTML
-            let label_with_tags = metadata.render_with_tags(&link);
-            writeln!(index_html, "<li>{}</li>", label_with_tags)?;
+            let mut label = metadata.render_label(&link);
 
             // Populate tags map
             if let Some(ref tags) = metadata.tags {
                 for tag in tags {
-                    tags_map
-                        .entry(tag.clone())
-                        .or_default()
-                        .push(metadata.render_label(&link));
+                    tags_map.entry(tag.clone()).or_default().push(label.clone());
                 }
+                label.push_str("<br>");
+                label.push_str(
+                    &tags
+                        .iter()
+                        .map(|tag| format!("<a href=\"tags.html#{tag}\"><em>{tag}</em></a>"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
             }
+
+            writeln!(index_html, "<li>{}</li>", label)?;
         } else if src_path.is_dir() {
             fs::create_dir_all(&dst_path).with_context(|| "Failed to create _site dir")?
         } else {
@@ -167,7 +149,7 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 }
 
 fn tags_page(tags_map: BTreeMap<String, Vec<String>>, tags_path: &Path) -> Result<()> {
-    let estimated_size = tags_map.len() * 300 + HEADER.len() + FOOTER.len();
+    let estimated_size = tags_map.len() * 200 + HEADER.len() + FOOTER.len();
     let mut article_html = String::with_capacity(estimated_size);
 
     article_html.push_str(

@@ -1,5 +1,5 @@
 ---
-title: Demo
+title: Demonstration
 subtitle: A post to demonstrate the blog's features.
 tags:
   - Markdown
