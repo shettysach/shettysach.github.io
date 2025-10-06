@@ -4,6 +4,7 @@ subtitle: A post to demonstrate the blog's features.
 tags:
   - Markdown
   - Blog
+toc: true
 ---
 
 # Demonstration
@@ -22,11 +23,7 @@ Organize content using headings and paragraphs. Markdown supports:
 
 ## Anchors and Linking
 
-You can create internal anchor links using `{#id}` syntax in headings.
-
-* [Lists](#lists)
-* [Mathematical Expressions](#mathematical-expressions)
-* [Code Blocks](#code-blocks)
+You can create internal anchor links using `{#id}` syntax in headings. Eg - [Lists](#lists).
 
 ## Lists {#lists}
 
@@ -103,17 +100,17 @@ invert (Node l v r) = Node (invert <$> r) v (invert <$> l)
 invert (Leaf v)     = Leaf v
 ```
 
-## Links and Images
+## Links and Images {#links-and-images}
 
 ### Links
 
-[Link to another article](../03_render/render.html)
+[Link to another article](../01_render/render.html)
 
 Written as `[Link to another article](../03_render/render.html)`.
 
 ### Image
 
-![dog](./dog.jpg)
+![apple](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQvh9e5WKA1njqGh-8xSgh52YDdepBiH5DqpA&s)
 
-Written as `![dog](./dog.jpg)`.
+Written as `![apple](url to image)`.
 

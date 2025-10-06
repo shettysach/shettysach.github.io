@@ -1,12 +1,17 @@
 use crate::generate::{Article, Metadata};
 use anyhow::{Error, Result};
-use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Tag, TagEnd};
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::{SyntaxReference, SyntaxSet},
 };
 use yaml_rust2::{Yaml, YamlLoader};
+
+pub(crate) const OPTIONS: Options = Options::empty()
+    .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
+    .union(Options::ENABLE_MATH)
+    .union(Options::ENABLE_HEADING_ATTRIBUTES);
 
 pub(crate) trait Syntex<'a> {
     fn process(self, syntax_set: &SyntaxSet) -> Result<Article<'a>>;
@@ -153,7 +158,7 @@ pub(crate) fn extract_metadata(markdown: &str) -> Result<Metadata> {
     let rest = &markdown[start + 4..];
     let end = rest
         .find("\n---\n")
-        .ok_or_else(|| Error::msg("Invalid frontmatter: missing closing ---"))?;
+        .ok_or_else(|| Error::msg("Invalid frontmatter"))?;
     let yaml_str = &rest[..end];
     let docs = YamlLoader::load_from_str(yaml_str)?;
     parse_metadata(docs).ok_or_else(|| Error::msg("Failed to parse metadata"))

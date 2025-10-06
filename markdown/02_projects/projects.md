@@ -6,6 +6,7 @@ tags:
   - Python
   - Odin
   - Haskell
+toc: true
 ---
 
 # Projects

@@ -6,7 +6,6 @@ This is a personal blog where I write about programming, technology, and other t
 
 The blog contains articles on various technical topics including:
 
-- Programming tutorials and guides
 - Project showcases
 - Technical demos
 - Personal thoughts on technology
@@ -15,8 +14,4 @@ The blog contains articles on various technical topics including:
 
 - Home: index.html
 - Tags: tags.html
-- Individual posts are in subdirectories
-
-## Contact
-
-You can find me on GitHub or other platforms.
+- These 2 pages consist of links to other posts

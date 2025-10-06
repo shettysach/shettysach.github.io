@@ -1,29 +1,4 @@
-@import "./pulldown_latex.css";
 @import "./code.css";
-
-@font-face {
-  font-family: "Lora";
-  src: url("../fonts/Lora-VariableFont_wght.ttf") format("truetype");
-  font-weight: 400 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Lora";
-  src: url("../fonts/Lora-Italic-VariableFont_wght.ttf") format("truetype");
-  font-weight: 400 600;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("../fonts/JetBrainsMono-VariableFont_wght.ttf") format("truetype");
-  font-weight: 400 600;
-  font-style: normal;
-  font-display: swap;
-}
 
 :root {
   --terminal-red: #f7768e;
@@ -50,19 +25,15 @@ body {
   font-family: "Lora", serif;
   margin: 0;
   padding: 0;
-
   background-color: var(--editor-background-night);
-
   background-image:
     linear-gradient(rgba(26, 27, 38, 0.75), rgba(26, 27, 38, 0.75)),
     url("../assets/background.avif");
-  background-size: cover;         /* scale image to cover viewport */
-  background-position: center;    /* center the image */
-  background-repeat: no-repeat;   /* no tiling */
-  background-attachment: fixed;   /* optional: parallax-like */
-
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--variables-class-names);
-
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -76,7 +47,6 @@ main {
 }
 
 header {
-  /* background: var(--editor-background-storm); */
   background: rgba(36, 40, 59, 0.5);
   color: var(--variables-class-names);
   padding: 1rem 20%;
@@ -86,33 +56,10 @@ header {
 }
 
 footer {
-  /* background: var(--editor-background-storm); */
   background: rgba(36, 40, 59, 0.5);
   color: var(--variables-class-names);
   text-align: center;
   padding: 1rem;
-}
-
-hr {
-  color: var(--function-names);
-  border-color: var(--function-names);
-}
-
-header nav {
-  display: flex;
-  gap: 2rem;
-  align-items: center;
-}
-
-header nav ul {
-  list-style: none;
-  margin: 0;
-  display: flex;
-  gap: 2rem;
-}
-
-header nav ul li {
-  display: inline;
 }
 
 section {
@@ -129,12 +76,6 @@ h6 {
   color: var(--object-properties);
   margin-bottom: 1rem;
 }
-
-hr {
-  color: var(--function-names);
-  border-color: var(--function-names);
-}
-
 
 p {
   color: var(--variables-class-names);
@@ -154,6 +95,17 @@ code {
   font-family: "JetBrains Mono", monospace;
 }
 
+p code,
+span code {
+  white-space: nowrap;
+  display: inline;
+}
+
+pre code {
+  white-space: pre;
+  display: block;
+}
+
 math {
   overflow-x: auto;
   overflow-y: clip;
@@ -163,17 +115,6 @@ math {
 math[display="block"] {
   font-size: 115%;
   margin: 1rem 1rem;
-}
-
-p code,
-span code {
-  white-space: nowrap;
-  display: inline;
-}
-
-pre code {
-  white-space: pre;
-  Display: block;
 }
 
 blockquote {
@@ -213,11 +154,33 @@ a:hover {
 }
 
 img {
-    max-width: 100%;
+  max-width: 100%;
+}
+
+hr {
+  color: var(--function-names);
+  border-color: var(--function-names);
+}
+
+header nav {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+header nav ul {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  gap: 2rem;
+}
+
+header nav ul li {
+  display: inline;
 }
 
 .ascii {
-    color: var(--object-literal-keys); 
+  color: var(--object-literal-keys);
 }
 
 @media (max-width: 768px) {
