@@ -11,8 +11,7 @@ tags:
 # Rendering math and highlighting code
 
 This section explains how the blog renders math and highlights syntax, using only static HTML and CSS.
-The code for this is located in the [`syntex`](https://github.com/shettysach/shettysach.github.io/blob/main/src/syntex.rs)
-module, a portmanteau of syntax and TeX.
+The relevant code for this section is located [`here`](https://github.com/shettysach/shettysach.github.io/blob/main/src/syntex.rs).
 
 ---
 

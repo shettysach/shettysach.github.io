@@ -1,0 +1,22 @@
+# Sachith Shetty's Blog
+
+This is a personal blog where I write about programming, technology, and other topics I'm interested in.
+
+## Content
+
+The blog contains articles on various technical topics including:
+
+- Programming tutorials and guides
+- Project showcases
+- Technical demos
+- Personal thoughts on technology
+
+## Navigation
+
+- Home: index.html
+- Tags: tags.html
+- Individual posts are in subdirectories
+
+## Contact
+
+You can find me on GitHub or other platforms.

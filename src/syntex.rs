@@ -24,7 +24,7 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
         let mut captive = String::new();
 
         let mut metadata_init = None;
-        let mut events = Vec::new(); // Can't determine length without consuming
+        let mut events = Vec::with_capacity(1000); // Rough estimate to reduce reallocations
 
         for event in self {
             match event {
@@ -34,9 +34,7 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
 
                 // WARN: Apparently invalid html5, but works due to browser leniency
                 // Replace <a><h> with <h><a>
-                Event::Start(Tag::Heading {
-                    level: _, ref id, ..
-                }) => {
+                Event::Start(Tag::Heading { ref id, .. }) => {
                     if let Some(id) = id {
                         anchored = true;
                         let anchor = Event::Html(CowStr::from(format!("<a href=\"#{id}\">")));
@@ -146,4 +144,17 @@ fn parse_metadata(docs: Vec<Yaml>) -> Option<Metadata> {
         subtitle,
         tags,
     })
+}
+
+pub(crate) fn extract_metadata(markdown: &str) -> Result<Metadata> {
+    let start = markdown
+        .find("---\n")
+        .ok_or_else(|| Error::msg("No frontmatter found"))?;
+    let rest = &markdown[start + 4..];
+    let end = rest
+        .find("\n---\n")
+        .ok_or_else(|| Error::msg("Invalid frontmatter: missing closing ---"))?;
+    let yaml_str = &rest[..end];
+    let docs = YamlLoader::load_from_str(yaml_str)?;
+    parse_metadata(docs).ok_or_else(|| Error::msg("Failed to parse metadata"))
 }

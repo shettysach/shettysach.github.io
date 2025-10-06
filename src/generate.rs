@@ -1,13 +1,14 @@
 use anyhow::{Context, Result};
 use pulldown_cmark::{Event, Options, Parser, html};
-use std::{collections::BTreeMap, fmt::Write, fs, path::Path};
+use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
 use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
-use crate::syntex::Syntex;
+use crate::syntex::{Syntex, extract_metadata};
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
+const DEFAULT_TAGS: &str = "blog, blogpost, programming";
 const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(Options::ENABLE_MATH)
@@ -32,6 +33,13 @@ impl Metadata {
                 "{{DESCRIPTION}}",
                 self.subtitle.as_deref().unwrap_or("Blogpost"),
             )
+            .replace(
+                "{{TAGS}}",
+                &self
+                    .tags
+                    .as_ref()
+                    .map_or(DEFAULT_TAGS.to_string(), |tags| tags.join(", ")),
+            )
     }
 
     fn render_label(&self, link: &Path) -> String {
@@ -50,43 +58,37 @@ impl Metadata {
 }
 
 fn render_markdown(src: &Path, dst: &Path, syntax_set: &SyntaxSet) -> Result<Metadata> {
-    let markdown = fs::read_to_string(src)
-        .with_context(|| format!("Failed to read markdown file: {}", src.display()))?;
+    let markdown = fs::read_to_string(src)?;
 
-    let Article { events, metadata } = Parser::new_ext(&markdown, OPTIONS)
-        .process(syntax_set)
-        .with_context(|| format!("Failed to process markdown: {}", src.display()))?;
-
-    // Create parent directory if it doesn't exist
-    if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
+    if dst.exists() && dst.metadata()?.modified()? > src.metadata()?.modified()? {
+        return extract_metadata(&markdown);
     }
 
-    let mut page = String::with_capacity(HEADER.len() + FOOTER.len() + markdown.len() * 2);
+    let Article { events, metadata } = Parser::new_ext(&markdown, OPTIONS).process(syntax_set)?;
+
+    let md_len = markdown.len();
+    let mut page = String::with_capacity(HEADER.len() + FOOTER.len() + md_len + (md_len >> 1));
     page.push_str(&metadata.generate_header());
     html::push_html(&mut page, events.into_iter());
     page.push_str(FOOTER);
 
-    fs::write(dst, page)
-        .with_context(|| format!("Failed to write HTML file: {}", dst.display()))?;
+    fs::write(dst, page)?;
 
     Ok(metadata)
 }
 
 pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let syntax_set = SyntaxSet::load_defaults_newlines();
-    let mut tags_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::new();
 
     // Process index.md
-    let index_md =
-        fs::read_to_string(markdown_dir.join("index.md")).context("Failed to read index.md")?;
+    let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
 
-    let Article { metadata, events } = Parser::new_ext(&index_md, OPTIONS)
-        .process(&syntax_set)
-        .context("Failed to process index.md")?;
+    let Article { metadata, events } = Parser::new_ext(&index_md, OPTIONS).process(&syntax_set)?;
 
-    let mut index_html = String::with_capacity(HEADER.len() + FOOTER.len() + index_md.len() * 2);
+    let md_len = index_md.len();
+    let mut index_html =
+        String::with_capacity(HEADER.len() + FOOTER.len() + md_len + (md_len >> 1));
     index_html.push_str(&metadata.generate_header());
     html::push_html(&mut index_html, events.into_iter());
     index_html.push_str("<ul>\n");
@@ -110,13 +112,20 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             let metadata = render_markdown(src_path, &html_dst, &syntax_set)?;
             let link = rel_path.with_extension("html");
 
-            let mut label = metadata.render_label(&link);
+            let label_rc = Rc::new(metadata.render_label(&link));
 
             // Populate tags map
             if let Some(ref tags) = metadata.tags {
                 for tag in tags {
-                    tags_map.entry(tag.clone()).or_default().push(label.clone());
+                    tags_map
+                        .entry(tag.clone())
+                        .or_default()
+                        .push(Rc::clone(&label_rc));
                 }
+            }
+
+            let mut label = (*label_rc).clone();
+            if let Some(ref tags) = metadata.tags {
                 label.push_str("<br>");
                 label.push_str(
                     &tags
@@ -129,11 +138,9 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
             writeln!(index_html, "<li>{}</li>", label)?;
         } else if src_path.is_dir() {
-            fs::create_dir_all(&dst_path).with_context(|| "Failed to create _site dir")?
+            fs::create_dir_all(&dst_path)?
         } else {
-            fs::copy(src_path, dst_path)
-                .with_context(|| format!("Failed to copy file: {}", src_path.display()))
-                .map(|_| {})?
+            fs::copy(src_path, dst_path)?;
         }
     }
 
@@ -148,33 +155,35 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn tags_page(tags_map: BTreeMap<String, Vec<String>>, tags_path: &Path) -> Result<()> {
-    let estimated_size = tags_map.len() * 200 + HEADER.len() + FOOTER.len();
+fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Result<()> {
+    let mut tags: Vec<String> = tags_map.keys().cloned().collect();
+    tags.sort();
+    let estimated_size = tags.len() * 200 + HEADER.len() + FOOTER.len();
     let mut article_html = String::with_capacity(estimated_size);
 
     article_html.push_str(
         &HEADER
             .replace("{{TITLE}}", "Tags")
-            .replace("{{DESCRIPTION}}", "Page for tagged articles"),
+            .replace("{{DESCRIPTION}}", "Page for tagged articles")
+            .replace("{{TAGS}}", "Sachith Shetty, blog, tags"),
     );
-    article_html.push_str("<h1>Tags</h1>\n<hr>\n");
 
-    for (tag, labels) in tags_map {
+    for tag in tags {
+        let labels = &tags_map[&tag];
         writeln!(
             article_html,
-            "<h3 id=\"{tag}\"><a href=\"#{tag}\"><em>{tag}</em></a></h3>"
+            "<h1 id=\"{tag}\"><a href=\"#{tag}\"><em>{tag}</em></a></h1>"
         )?;
 
         article_html.push_str("<ul>\n");
         for label in labels {
             writeln!(article_html, "<li>{}</li>", label)?;
         }
-        article_html.push_str("</ul>\n<hr>\n");
+        article_html.push_str("</ul>\n<br><hr>\n");
     }
 
     article_html.push_str(FOOTER);
-    fs::write(tags_path, article_html)
-        .with_context(|| format!("Failed to write tags file: {}", tags_path.display()))?;
+    fs::write(tags_path, article_html)?;
 
     Ok(())
 }

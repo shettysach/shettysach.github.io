@@ -1,6 +1,6 @@
 ---
-title: Home
-subtitle: Welcome to my website
+title: Blog
+subtitle: Welcome to my blog
 ---
 
 # Welcome

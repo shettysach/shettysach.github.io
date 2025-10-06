@@ -9,7 +9,7 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> io::Result<()> {
         let rel_path = path.strip_prefix(src).unwrap();
         let target_path = dst.join(rel_path);
 
-        if entry.file_type().is_dir() {
+        if entry.file_type().is_dir() && !target_path.exists() {
             fs::create_dir_all(&target_path)?;
         } else if entry.file_type().is_file() {
             if let Some(parent) = target_path.parent() {
