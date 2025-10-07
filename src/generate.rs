@@ -1,5 +1,8 @@
 use anyhow::{Context, Result};
-use pulldown_cmark::{Parser, html};
+use pulldown_cmark::{
+    Parser,
+    html::{self, push_html},
+};
 use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
 use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
@@ -21,7 +24,11 @@ fn render_markdown(
         return extract_metadata(&markdown);
     }
 
-    let Article { events, metadata } = Parser::new_ext(&markdown, OPTIONS).process(syntax_set)?;
+    let Article {
+        events,
+        metadata,
+        toc,
+    } = Parser::new_ext(&markdown, OPTIONS).process(syntax_set)?;
 
     let rel_path = dst.strip_prefix(html_dir).unwrap().to_string_lossy();
 
@@ -30,6 +37,14 @@ fn render_markdown(
     let mut html = String::with_capacity(est_size);
 
     html.push_str(&metadata.header(&rel_path));
+
+    if let Some(table) = toc {
+        let table = Parser::new(&table);
+        html.push_str("<details><summary> Table of contents </summary>");
+        push_html(&mut html, table);
+        html.push_str("</details>");
+    }
+
     html::push_html(&mut html, events.into_iter());
     html.push_str(FOOTER);
 
@@ -43,7 +58,9 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::new();
 
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
-    let Article { metadata, events } = Parser::new_ext(&index_md, OPTIONS).process(&syntax_set)?;
+    let Article {
+        metadata, events, ..
+    } = Parser::new_ext(&index_md, OPTIONS).process(&syntax_set)?;
 
     let md_len = index_md.len();
     let est_size = HEADER.len() + FOOTER.len() + md_len + (md_len >> 1);
@@ -126,10 +143,7 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
 
     for tag in tags {
         let labels = &tags_map[tag];
-        writeln!(
-            article_html,
-            "<h1 id=\"{tag}\"><a href=\"#{tag}\"><em>{tag}</em></a></h1>"
-        )?;
+        writeln!(article_html, "<h1 id=\"{tag}\"><em>{tag}</em></h1>")?;
 
         article_html.push_str("<ul>\n");
         for label in labels {

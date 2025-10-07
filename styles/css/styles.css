@@ -52,8 +52,26 @@ header {
   padding: 1rem 20%;
   position: sticky;
   z-index: 1000;
+}
+
+header nav {
   font-size: 1.25rem;
 }
+
+details {
+  background-color: rgba(36, 40, 59, 0.5);
+  padding: 0.5rem;
+}
+
+details summary {
+  color: var(--object-properties);
+}
+
+summary::marker {
+  font-family: "JetBrains Mono", monospace;
+  content: "+";
+}
+details[open] > summary::marker { content: "-"; }
 
 footer {
   background: rgba(36, 40, 59, 0.5);
@@ -138,6 +156,9 @@ ol ul {
   padding-left: 0rem;
   margin-left: 1rem;
 }
+
+ul, ul ul ul { list-style-type: disc; }
+ul ul, ul ul ul ul { list-style-type: square; }
 
 li {
   padding-left: 0.5rem;

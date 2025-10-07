@@ -32,8 +32,9 @@ Lists are useful for outlining steps or concepts. Both unordered and ordered lis
 ### Unordered
 
 - Clean formatting
-- Support for nested items
-- Can include **formatting**, `code`, and $math$
+  - Support for nested items
+    - Can include **formatting**, `code`, and $math$
+      - Can include **formatting**, `code`, and $math$
 
 ### Ordered
 

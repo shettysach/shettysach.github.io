@@ -1,6 +1,9 @@
 use anyhow::{Error, Result};
-use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Tag, TagEnd};
+use pulldown_cmark::{
+    CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Tag, TagEnd,
+};
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
+use slug::slugify;
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::{SyntaxReference, SyntaxSet},
@@ -35,12 +38,13 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
         let mut syntax = plain_text;
         let mut storage = Storage::new();
 
-        let mut anchored = false;
         let mut capture = false;
+        let mut toc: Option<String> = None;
+
         let mut captive = String::new();
 
         let mut metadata_init = None;
-        let mut events = Vec::with_capacity(1000); // Rough estimate to reduce reallocations
+        let mut events = Vec::new();
 
         for event in self {
             match event {
@@ -48,23 +52,27 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
 
                 Event::Text(t) => events.push(Event::Html(t)),
 
-                // WARN: Apparently invalid html5, but works due to browser leniency
-                // Replace <a><h> with <h><a>
-                Event::Start(Tag::Heading { ref id, .. }) => {
-                    if let Some(id) = id {
-                        anchored = true;
-                        let anchor = Event::Html(CowStr::from(format!("<a href=\"#{id}\">")));
-                        events.push(anchor);
+                Event::Start(Tag::Heading { .. }) if toc.is_some() => capture = true,
+
+                Event::End(TagEnd::Heading(level)) => {
+                    if let Some(table) = toc.as_mut() {
+                        let anchor_str = slugify(&captive);
+                        capture = false;
+
+                        table.push_str(&table_bullet(level, &captive, &anchor_str));
+
+                        events.push(Event::Start(Tag::Heading {
+                            level,
+                            id: Some(CowStr::from(anchor_str)),
+                            classes: Vec::new(),
+                            attrs: Vec::new(),
+                        }));
+
+                        let text = std::mem::take(&mut captive);
+                        events.push(Event::Html(CowStr::from(text)));
                     }
-                    events.push(event);
-                }
 
-                Event::End(TagEnd::Heading(_)) if anchored => {
-                    let anchor_end = Event::Html(CowStr::Borrowed("</a>"));
                     events.push(event);
-                    events.push(anchor_end);
-
-                    anchored = false;
                 }
 
                 Event::Start(Tag::CodeBlock(kind)) => {
@@ -102,7 +110,10 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
 
                 Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle)) => {
                     let docs = YamlLoader::load_from_str(&captive)?;
-                    metadata_init = parse_metadata(docs);
+
+                    (metadata_init, toc) = parse_metadata(docs)
+                        .map(|(init, has_toc)| (Some(init), has_toc.then(String::new)))
+                        .unwrap_or((None, None));
 
                     captive.clear();
                     capture = false;
@@ -112,7 +123,6 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
             }
         }
 
-        let toc = None;
         metadata_init
             .map(|metadata| Article {
                 metadata,
@@ -152,19 +162,23 @@ fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) 
     Ok(format!("<pre><code>{}</code></pre>", class_gen.finalize()))
 }
 
-fn parse_metadata(docs: Vec<Yaml>) -> Option<Metadata> {
+fn parse_metadata(docs: Vec<Yaml>) -> Option<(Metadata, bool)> {
     let doc = docs.first()?;
     let title = doc["title"].as_str()?.to_string();
-    let subtitle = doc["subtitle"].as_str().map(String::from);
+    let subtitle = doc["subtitle"].as_str().map(str::to_string);
     let tags = doc["tags"]
         .as_vec()
         .and_then(|vec| vec.iter().map(|v| v.as_str().map(String::from)).collect());
+    let create_toc = doc["toc"].as_bool().is_some_and(|t| t);
 
-    Some(Metadata {
-        title,
-        subtitle,
-        tags,
-    })
+    Some((
+        Metadata {
+            title,
+            subtitle,
+            tags,
+        },
+        create_toc,
+    ))
 }
 
 pub(crate) fn extract_metadata(markdown: &str) -> Result<Metadata> {
@@ -177,5 +191,19 @@ pub(crate) fn extract_metadata(markdown: &str) -> Result<Metadata> {
         .ok_or_else(|| Error::msg("Invalid frontmatter"))?;
     let yaml_str = &rest[..end];
     let docs = YamlLoader::load_from_str(yaml_str)?;
-    parse_metadata(docs).ok_or_else(|| Error::msg("Failed to parse metadata"))
+    parse_metadata(docs)
+        .ok_or_else(|| Error::msg("Failed to parse metadata"))
+        .map(|x| x.0)
+}
+
+pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor: &str) -> String {
+    let indent = "  ".repeat(match level {
+        HeadingLevel::H1 => 0,
+        HeadingLevel::H2 => 1,
+        HeadingLevel::H3 => 2,
+        HeadingLevel::H4 => 3,
+        HeadingLevel::H5 => 4,
+        HeadingLevel::H6 => 5,
+    });
+    format!("{indent}- [{heading}](#{anchor})\n")
 }

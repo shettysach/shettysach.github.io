@@ -6,6 +6,7 @@ tags:
     - Blog
     - Rust
     - LaTeX
+toc: true
 ---
 
 # Rendering math and highlighting code
