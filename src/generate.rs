@@ -1,58 +1,13 @@
 use anyhow::{Context, Result};
-use pulldown_cmark::{Event, Parser, html};
+use pulldown_cmark::{Parser, html};
 use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
 use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
-use crate::syntex::{OPTIONS, Syntex, extract_metadata};
+use crate::syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata};
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
-
-pub(crate) struct Article<'a> {
-    pub(crate) metadata: Metadata,
-    pub(crate) events: Vec<Event<'a>>,
-}
-
-pub(crate) struct Metadata {
-    pub(crate) title: String,
-    pub(crate) subtitle: Option<String>,
-    pub(crate) tags: Option<Vec<String>>,
-}
-
-impl Metadata {
-    fn header(&self, url: &str) -> String {
-        HEADER
-            .replace("{{TITLE}}", &self.title)
-            .replace(
-                "{{DESCRIPTION}}",
-                self.subtitle.as_deref().unwrap_or("Blogpost"),
-            )
-            .replace(
-                "{{TAGS}}",
-                &self
-                    .tags
-                    .as_ref()
-                    .map(|tags| tags.join(", "))
-                    .unwrap_or_else(|| "blog, blogpost".to_string()),
-            )
-            .replace("{{URL}}", url)
-    }
-
-    fn label(&self, link: &Path) -> String {
-        let mut label = format!(
-            "<h2><a href=\"{}\">{}</a></h2>",
-            link.to_string_lossy(),
-            self.title
-        );
-
-        if let Some(ref subtitle) = self.subtitle {
-            label.push_str(subtitle);
-        }
-
-        label
-    }
-}
 
 fn render_markdown(
     src: &Path,
@@ -72,13 +27,13 @@ fn render_markdown(
 
     let md_len = markdown.len();
     let est_size = HEADER.len() + FOOTER.len() + md_len + (md_len >> 1);
-    let mut page = String::with_capacity(est_size);
+    let mut html = String::with_capacity(est_size);
 
-    page.push_str(&metadata.header(&rel_path));
-    html::push_html(&mut page, events.into_iter());
-    page.push_str(FOOTER);
+    html.push_str(&metadata.header(&rel_path));
+    html::push_html(&mut html, events.into_iter());
+    html.push_str(FOOTER);
 
-    fs::write(dst, page)?;
+    fs::write(dst, html)?;
 
     Ok(metadata)
 }
@@ -118,22 +73,20 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             let link = rel_path.with_extension("html");
 
             let label_rc = Rc::new(metadata.label(&link));
-
             let mut label = (*label_rc).clone();
-            if let Some(ref tags) = metadata.tags {
+
+            if let Some(tags) = metadata.tags {
                 label.push_str("<br>");
                 label.push_str(
                     &tags
                         .iter()
                         .map(|tag| format!("<a href=\"tags.html#{tag}\"><em>{tag}</em></a>"))
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<String>>()
                         .join(", "),
                 );
-            }
 
-            if let Some(tags) = metadata.tags {
                 for tag in tags {
-                    tags_map.entry(tag).or_default().push(Rc::clone(&label_rc));
+                    tags_map.entry(tag).or_default().push(label_rc.clone());
                 }
             }
 
@@ -189,4 +142,38 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
     fs::write(tags_path, article_html)?;
 
     Ok(())
+}
+
+impl Metadata {
+    fn header(&self, url: &str) -> String {
+        HEADER
+            .replace("{{TITLE}}", &self.title)
+            .replace(
+                "{{DESCRIPTION}}",
+                self.subtitle.as_deref().unwrap_or("Blogpost"),
+            )
+            .replace(
+                "{{TAGS}}",
+                &self
+                    .tags
+                    .as_ref()
+                    .map(|tags| tags.join(", "))
+                    .unwrap_or_else(|| "blog, blogpost".to_string()),
+            )
+            .replace("{{URL}}", url)
+    }
+
+    fn label(&self, link: &Path) -> String {
+        let mut label = format!(
+            "<h2><a href=\"{}\">{}</a></h2>",
+            link.to_string_lossy(),
+            self.title
+        );
+
+        if let Some(subtitle) = &self.subtitle {
+            label.push_str(subtitle);
+        }
+
+        label
+    }
 }

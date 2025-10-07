@@ -1,4 +1,3 @@
-use crate::generate::{Article, Metadata};
 use anyhow::{Error, Result};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Tag, TagEnd};
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
@@ -12,6 +11,18 @@ pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(Options::ENABLE_MATH)
     .union(Options::ENABLE_HEADING_ATTRIBUTES);
+
+pub(crate) struct Article<'a> {
+    pub(crate) metadata: Metadata,
+    pub(crate) events: Vec<Event<'a>>,
+    pub(crate) toc: Option<String>,
+}
+
+pub(crate) struct Metadata {
+    pub(crate) title: String,
+    pub(crate) subtitle: Option<String>,
+    pub(crate) tags: Option<Vec<String>>,
+}
 
 pub(crate) trait Syntex<'a> {
     fn process(self, syntax_set: &SyntaxSet) -> Result<Article<'a>>;
@@ -101,8 +112,13 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
             }
         }
 
+        let toc = None;
         metadata_init
-            .map(|metadata| Article { metadata, events })
+            .map(|metadata| Article {
+                metadata,
+                events,
+                toc,
+            })
             .ok_or_else(|| Error::msg("Metadata error"))
     }
 }
