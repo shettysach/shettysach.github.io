@@ -105,13 +105,12 @@ invert (Leaf v)     = Leaf v
 
 ### Links
 
-[Link to another article](../01_render/render.html)
+[Link to article](../01_render/render.html)
 
-Written as `[Link to another article](../03_render/render.html)`.
+Written as `[Link to article](../01_render/render.html)`.
 
 ### Image
 
 ![apple](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQvh9e5WKA1njqGh-8xSgh52YDdepBiH5DqpA&s)
 
-Written as `![apple](url to image)`.
-
+Written as `![apple](https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQvh9e5WKA1njqGh-8xSgh52YDdepBiH5DqpA&s)`.

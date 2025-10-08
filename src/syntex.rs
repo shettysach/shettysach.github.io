@@ -1,9 +1,9 @@
+use crate::utils::Slugger;
 use anyhow::{Error, Result};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Tag, TagEnd,
 };
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
-use slug::slugify;
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::{SyntaxReference, SyntaxSet},
@@ -31,6 +31,13 @@ pub(crate) trait Syntex<'a> {
     fn process(self, syntax_set: &SyntaxSet) -> Result<Article<'a>>;
 }
 
+struct Heading<'a> {
+    level: HeadingLevel,
+    id: Option<CowStr<'a>>,
+    classes: Vec<CowStr<'a>>,
+    attrs: Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
+}
+
 impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
     fn process(self: pulldown_cmark::Parser<'a>, syntax_set: &SyntaxSet) -> Result<Article<'a>> {
         let plain_text = syntax_set.find_syntax_plain_text();
@@ -41,34 +48,61 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
         let mut capture = false;
         let mut toc: Option<String> = None;
 
-        let mut captive = String::new();
+        let mut captive_string = String::new();
+        let mut captive_heading = None;
 
         let mut metadata_init = None;
-        let mut events = Vec::new();
+
+        let bound = self.size_hint().1.unwrap_or(20);
+        let mut events = Vec::with_capacity(bound);
+        let mut slugger = Slugger::with_capacity(bound / 5);
 
         for event in self {
             match event {
-                Event::Text(t) if capture => captive.push_str(&t),
+                Event::Text(t) if capture => captive_string.push_str(&t),
 
                 Event::Text(t) => events.push(Event::Html(t)),
 
-                Event::Start(Tag::Heading { .. }) if toc.is_some() => capture = true,
+                Event::Start(Tag::Heading {
+                    level,
+                    id,
+                    classes,
+                    attrs,
+                }) if toc.is_some() => {
+                    captive_heading = Some(Heading {
+                        level,
+                        id,
+                        classes,
+                        attrs,
+                    });
+                    capture = true;
+                }
 
-                Event::End(TagEnd::Heading(level)) => {
+                Event::End(TagEnd::Heading(_)) => {
                     if let Some(table) = toc.as_mut() {
-                        let anchor_str = slugify(&captive);
+                        let Heading {
+                            level,
+                            id,
+                            classes,
+                            attrs,
+                        } = unsafe { captive_heading.take().unwrap_unchecked() };
                         capture = false;
 
-                        table.push_str(&table_bullet(level, &captive, &anchor_str));
+                        let id = match id {
+                            None => CowStr::Boxed(slugger.slug(&captive_string).into()),
+                            Some(cowstr) => cowstr,
+                        };
+
+                        table.push_str(&table_bullet(level, &captive_string, &id));
 
                         events.push(Event::Start(Tag::Heading {
                             level,
-                            id: Some(CowStr::from(anchor_str)),
-                            classes: Vec::new(),
-                            attrs: Vec::new(),
+                            id: Some(id),
+                            classes,
+                            attrs,
                         }));
 
-                        let text = std::mem::take(&mut captive);
+                        let text = std::mem::take(&mut captive_string);
                         events.push(Event::Html(CowStr::from(text)));
                     }
 
@@ -86,12 +120,12 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                 }
 
                 Event::End(TagEnd::CodeBlock) => {
-                    let highlighted = highlight_code(&captive, syntax, syntax_set)?;
+                    let highlighted = highlight_code(&captive_string, syntax, syntax_set)?;
                     let event = Event::Html(CowStr::from(highlighted));
                     events.push(event);
 
                     capture = false;
-                    captive.clear();
+                    captive_string.clear();
                 }
 
                 Event::DisplayMath(latex) => {
@@ -109,13 +143,13 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                 Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle)) => capture = true,
 
                 Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle)) => {
-                    let docs = YamlLoader::load_from_str(&captive)?;
+                    let docs = YamlLoader::load_from_str(&captive_string)?;
 
                     (metadata_init, toc) = parse_metadata(docs)
                         .map(|(init, has_toc)| (Some(init), has_toc.then(String::new)))
                         .unwrap_or((None, None));
 
-                    captive.clear();
+                    captive_string.clear();
                     capture = false;
                 }
 
@@ -196,7 +230,7 @@ pub(crate) fn extract_metadata(markdown: &str) -> Result<Metadata> {
         .map(|x| x.0)
 }
 
-pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor: &str) -> String {
+pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor_id: &str) -> String {
     let indent = "  ".repeat(match level {
         HeadingLevel::H1 => 0,
         HeadingLevel::H2 => 1,
@@ -205,5 +239,5 @@ pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor: &str) -> 
         HeadingLevel::H5 => 4,
         HeadingLevel::H6 => 5,
     });
-    format!("{indent}- [{heading}](#{anchor})\n")
+    format!("{indent}- [{heading}](#{anchor_id})\n")
 }

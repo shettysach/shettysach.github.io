@@ -7,7 +7,9 @@ edition = "2024"
 anyhow = "1.0.98"
 pulldown-cmark = "0.13.0" 
 pulldown-latex = "0.7.1"
-slug = "0.1.6"
+rustc-hash = "2.1.1"
+
 syntect = "5.2.0"
 walkdir = "2.5.0"
+xxhash-rust = { version = "0.8.15", features = ["xxh32"] }
 yaml-rust2 = "0.10.3"

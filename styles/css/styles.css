@@ -19,6 +19,9 @@
   --terminal-black: #414868;
   --editor-background-storm: #24283b;
   --editor-background-night: #1a1b26;
+
+  --storm-bg: rgba(36, 40, 59, 0.5);
+  /* --storm-bg: #24283b; */
 }
 
 body {
@@ -47,7 +50,8 @@ main {
 }
 
 header {
-  background: rgba(36, 40, 59, 0.5);
+  background: var(--storm-bg); 
+  position: fixed;
   color: var(--variables-class-names);
   padding: 1rem 20%;
   position: sticky;
@@ -59,30 +63,30 @@ header nav {
 }
 
 details {
-  background-color: rgba(36, 40, 59, 0.5);
+  background: var(--storm-bg); 
   padding: 0.5rem;
 }
 
-details summary {
+summary {
   color: var(--object-properties);
+  cursor: pointer;
+  list-style-type: none;
 }
 
 summary::marker {
   font-family: "JetBrains Mono", monospace;
-  content: "+";
+  content: "+\00A0";
 }
-details[open] > summary::marker { content: "-"; }
+details[open] > summary::marker { content: "-\00A0"; }
 
 footer {
-  background: rgba(36, 40, 59, 0.5);
+  background: var(--storm-bg); 
   color: var(--variables-class-names);
   text-align: center;
   padding: 1rem;
 }
 
-section {
-  margin-bottom: 2rem;
-}
+section { margin-bottom: 2rem; }
 
 h1,
 h2,
@@ -101,7 +105,7 @@ p {
 
 pre {
   font-family: "JetBrains Mono", monospace;
-  background-color: rgba(36, 40, 59, 0.5);
+  background: var(--storm-bg);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
@@ -115,7 +119,6 @@ code {
 
 p code,
 span code {
-  white-space: nowrap;
   display: inline;
 }
 
@@ -137,6 +140,7 @@ math[display="block"] {
 
 blockquote {
   border-left: 5px solid var(--control-keywords);
+  background: var(--storm-bg);
   margin: 1rem 0;
   padding-left: 1rem;
 }
@@ -210,6 +214,9 @@ header nav ul li {
   main {
     padding: 1rem 1rem;
     font-size: 1rem;
+    overflow-wrap: anywhere;
+    word-break: break-word; /* fallback/help for some engines */
+    hyphens: auto;          /* optional, nicer breaks for prose */
   }
 
   math {
