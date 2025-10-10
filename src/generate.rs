@@ -1,9 +1,10 @@
+use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
+
 use anyhow::{Context, Result};
 use pulldown_cmark::{
     Parser,
     html::{self, push_html},
 };
-use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
 use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
@@ -55,7 +56,6 @@ fn render_markdown(
 
 pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let syntax_set = SyntaxSet::load_defaults_newlines();
-    let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::new();
 
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
     let Article {
@@ -70,12 +70,14 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     html::push_html(&mut index_html, events.into_iter());
     index_html.push_str("<ul>\n");
 
-    for entry in WalkDir::new(markdown_dir)
-        .max_depth(2)
-        .sort_by_file_name()
+    let walker = WalkDir::new(markdown_dir)
         .into_iter()
-        .filter_map(Result::ok)
-    {
+        .filter_map(Result::ok);
+
+    // TODO: Estimate no. of tags somehow
+    let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
+
+    for entry in walker {
         let src_path = entry.path();
         let rel_path = src_path.strip_prefix(markdown_dir)?;
         let dst_path = html_dir.join(rel_path);

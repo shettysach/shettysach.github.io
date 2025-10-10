@@ -1,4 +1,5 @@
-use crate::utils::Slugger;
+use std::mem::take;
+
 use anyhow::{Error, Result};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Tag, TagEnd,
@@ -9,6 +10,8 @@ use syntect::{
     parsing::{SyntaxReference, SyntaxSet},
 };
 use yaml_rust2::{Yaml, YamlLoader};
+
+use crate::utils::Slugger;
 
 pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
@@ -88,10 +91,7 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                         } = unsafe { captive_heading.take().unwrap_unchecked() };
                         capture = false;
 
-                        let id = match id {
-                            None => CowStr::Boxed(slugger.slug(&captive_string).into()),
-                            Some(cowstr) => cowstr,
-                        };
+                        let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&captive_string)));
 
                         table.push_str(&table_bullet(level, &captive_string, &id));
 
@@ -101,9 +101,7 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                             classes,
                             attrs,
                         }));
-
-                        let text = std::mem::take(&mut captive_string);
-                        events.push(Event::Html(CowStr::from(text)));
+                        events.push(Event::Html(CowStr::from(take(&mut captive_string))));
                     }
 
                     events.push(event);

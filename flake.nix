@@ -12,18 +12,16 @@
     crane.url = "github:ipetkov/crane";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      rust-overlay,
-      crane,
-    }:
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+    rust-overlay,
+    crane,
+  }:
     flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        overlays = [ (import rust-overlay) ];
+      system: let
+        overlays = [(import rust-overlay)];
         pkgs = import nixpkgs {
           inherit system overlays;
         };
@@ -32,19 +30,15 @@
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         src = ./.;
-        buildInputs = [ ];
-        nativeBuildInputs = with pkgs; [
-          clang_15
-          mold
-          rustToolchain
-        ];
+        buildInputs = [];
+        nativeBuildInputs = with pkgs; [clang mold rustToolchain];
 
         commonArgs = {
           pname = "blog";
           version = "latest";
           strictDeps = true;
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          stdenv = p: p.stdenvAdapters.useMoldLinker (p.llvmPackages_15.stdenv);
+          stdenv = p: p.stdenvAdapters.useMoldLinker (p.llvmPackages.stdenv);
           CARGO_PROFILE = "release";
           CARGO_BUILD_RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold";
           inherit src buildInputs nativeBuildInputs;
@@ -58,31 +52,30 @@
           }
         );
       in
-      with pkgs;
-      {
-        checks = {
-          inherit bin;
+        with pkgs; {
+          checks = {
+            inherit bin;
 
-          told-clippy = craneLib.cargoClippy (
-            commonArgs
-            // {
-              inherit cargoArtifacts;
-              cargoClippyExtraArgs = "--all-targets";
-            }
-          );
-        };
+            told-clippy = craneLib.cargoClippy (
+              commonArgs
+              // {
+                inherit cargoArtifacts;
+                cargoClippyExtraArgs = "--all-targets";
+              }
+            );
+          };
 
-        packages = {
-          inherit bin;
-          default = bin;
-        };
+          packages = {
+            inherit bin;
+            default = bin;
+          };
 
-        devShells.default = mkShell {
-          inputsFrom = [ bin ];
-          buildInputs = [ pkgs.miniserve ];
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          CARGO_BUILD_RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold";
-        };
-      }
+          devShells.default = mkShell {
+            inputsFrom = [bin];
+            buildInputs = [pkgs.miniserve];
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+            CARGO_BUILD_RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold";
+          };
+        }
     );
 }

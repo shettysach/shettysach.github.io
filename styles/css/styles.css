@@ -17,11 +17,10 @@
   --markdown-html-text: #9aa5ce;
   --comments: #565f89;
   --terminal-black: #414868;
-  --editor-background-storm: #24283b;
   --editor-background-night: #1a1b26;
 
-  --storm-bg: rgba(36, 40, 59, 0.5);
   /* --storm-bg: #24283b; */
+  --storm-bg: rgba(36, 40, 59, 0.5);
 }
 
 body {
@@ -88,18 +87,11 @@ footer {
 
 section { margin-bottom: 2rem; }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-weight: normal;
   color: var(--object-properties);
   margin-bottom: 1rem;
 }
-
-p {
   color: var(--variables-class-names);
 }
 
@@ -152,10 +144,7 @@ ol {
   margin-left: 1rem;
 }
 
-ul ul,
-ol ol,
-ul ol,
-ol ul {
+ul ul, ol ol, ul ol, ol ul {
   list-style-position: outside;
   padding-left: 0rem;
   margin-left: 1rem;

@@ -1,13 +1,14 @@
-mod generate;
-mod syntex;
-mod utils;
+use std::{env, fs, path::Path};
 
 use anyhow::Result;
-use std::{env, fs, path::Path};
 use syntect::{
     highlighting::ThemeSet,
     html::{ClassStyle, css_for_theme_with_class_style},
 };
+
+mod generate;
+mod syntex;
+mod utils;
 
 fn main() -> Result<()> {
     let input_dir = Path::new("markdown");

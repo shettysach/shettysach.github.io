@@ -1,4 +1,6 @@
-use std::{fs, io, path::Path};
+use std::{fs, path::Path};
+
+use anyhow::Result;
 use walkdir::WalkDir;
 
 use rustc_hash::{FxBuildHasher, FxHashMap};
@@ -15,14 +17,9 @@ impl Slugger {
         }
     }
 
-    fn hash_heading(&mut self, slug: &str) -> u32 {
-        let v = xxh32(slug.as_bytes(), 0);
-        v.to_le()
-    }
-
     pub(crate) fn slug(&mut self, input: &str) -> String {
         let base = slugify(input);
-        let key = self.hash_heading(&base);
+        let key = hash_str(&base);
 
         match self.counts.get_mut(&key) {
             Some(c) => {
@@ -37,7 +34,12 @@ impl Slugger {
     }
 }
 
-pub fn slugify(s: &str) -> String {
+#[inline]
+fn hash_str(slug: &str) -> u32 {
+    xxh32(slug.as_bytes(), 0).to_le()
+}
+
+fn slugify(s: &str) -> String {
     let mut last_dash = true;
     s.chars()
         .filter_map(|c| {
@@ -54,19 +56,20 @@ pub fn slugify(s: &str) -> String {
         .collect()
 }
 
-pub(crate) fn copy_directory(src: &Path, dst: &Path) -> io::Result<()> {
+pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
     for entry in WalkDir::new(src).max_depth(2).into_iter().flatten() {
-        let path = entry.path();
-        let rel_path = path.strip_prefix(src).unwrap();
-        let target_path = dst.join(rel_path);
+        let source = entry.path();
+        let rel_path = source.strip_prefix(src)?;
+        let target = dst.join(rel_path);
 
-        if entry.file_type().is_dir() && !target_path.exists() {
-            fs::create_dir_all(&target_path)?;
-        } else if entry.file_type().is_file() {
-            if let Some(parent) = target_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::copy(path, &target_path)?;
+        // By default WalkDir puts directories first
+        if entry.file_type().is_dir() && !target.exists() {
+            fs::create_dir_all(&target)?;
+        } else if entry.file_type().is_file()
+            && target.exists()
+            && entry.metadata()?.modified()? > target.metadata()?.modified()?
+        {
+            fs::copy(source, &target)?;
         }
     }
     Ok(())
