@@ -1,10 +1,52 @@
-use std::{fs, path::Path};
+use std::{fs, io::BufReader, path::Path};
 
 use anyhow::Result;
-use walkdir::WalkDir;
-
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use syntect::{
+    highlighting::ThemeSet,
+    html::{ClassStyle, css_for_theme_with_class_style},
+};
+use walkdir::WalkDir;
 use xxhash_rust::xxh32::xxh32;
+
+// styles_dir
+
+pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
+    for entry in WalkDir::new(src).max_depth(2).into_iter().flatten() {
+        let source = entry.path();
+        let rel_path = source.strip_prefix(src)?;
+        let target = dst.join(rel_path);
+
+        if entry.file_type().is_dir() && !target.exists() {
+            fs::create_dir_all(&target)?;
+        } else if entry.file_type().is_file()
+            && (!target.exists()
+                || entry.metadata()?.modified()? > target.metadata()?.modified()?)
+        {
+            fs::copy(source, &target)?;
+        }
+    }
+    Ok(())
+}
+
+// code.css
+
+#[allow(dead_code)]
+pub(crate) fn generate_code_css(styles_dir: &Path) -> Result<()> {
+    let code_css_path = styles_dir.join("css").join("code.css");
+
+    if !code_css_path.exists() {
+        let file = fs::File::open("./Enki-Tokyo-Night.tmTheme")?;
+        let mut reader = BufReader::new(file);
+        let theme = &ThemeSet::load_from_reader(&mut reader)?;
+        let code_css = css_for_theme_with_class_style(theme, ClassStyle::Spaced)?;
+        fs::write(code_css_path, code_css)?;
+    }
+
+    Ok(())
+}
+
+// Slugger
 
 pub struct Slugger {
     counts: FxHashMap<u32, u8>,
@@ -54,23 +96,4 @@ fn slugify(s: &str) -> String {
             }
         })
         .collect()
-}
-
-pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
-    for entry in WalkDir::new(src).max_depth(2).into_iter().flatten() {
-        let source = entry.path();
-        let rel_path = source.strip_prefix(src)?;
-        let target = dst.join(rel_path);
-
-        // By default WalkDir puts directories first
-        if entry.file_type().is_dir() && !target.exists() {
-            fs::create_dir_all(&target)?;
-        } else if entry.file_type().is_file()
-            && target.exists()
-            && entry.metadata()?.modified()? > target.metadata()?.modified()?
-        {
-            fs::copy(source, &target)?;
-        }
-    }
-    Ok(())
 }

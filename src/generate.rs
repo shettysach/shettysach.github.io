@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use pulldown_cmark::{
     Parser,
     html::{self, push_html},
@@ -8,6 +9,7 @@ use pulldown_cmark::{
 use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
+use crate::atom::{FeedEntry, generate_atom_feed};
 use crate::syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata};
 
 const HEADER: &str = include_str!("../layout/header.html");
@@ -77,6 +79,9 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     // TODO: Estimate no. of tags somehow
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
 
+    // TODO: walker.count() consumes it
+    let mut feed_entries: Vec<FeedEntry> = Vec::with_capacity(10);
+
     for entry in walker {
         let src_path = entry.path();
         let rel_path = src_path.strip_prefix(markdown_dir)?;
@@ -90,6 +95,16 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             let html_dst = dst_path.with_extension("html");
             let metadata = render_markdown(src_path, &html_dst, html_dir, &syntax_set)?;
             let link = rel_path.with_extension("html");
+
+            let modified = src_path.metadata()?.modified()?;
+            let updated = DateTime::<Utc>::from(modified);
+
+            feed_entries.push(FeedEntry {
+                title: metadata.title.clone(),
+                link: link.to_string_lossy().to_string(),
+                updated,
+                summary: metadata.subtitle.clone(),
+            });
 
             let label_rc = Rc::new(metadata.label(&link));
             let mut label = (*label_rc).clone();
@@ -122,6 +137,13 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     fs::write(html_dir.join("index.html"), index_html)
         .with_context(|| "Failed to write index.html")?;
+
+    generate_atom_feed(
+        feed_entries,
+        "Sachith Shetty's Blog",
+        "index.html",
+        &html_dir.join("atom.xml"),
+    )?;
 
     tags_page(tags_map, &html_dir.join("tags.html"))?;
 

@@ -3,3 +3,6 @@
 /result
 /tmp
 .direnv
+
+perf.data*
+flamegraph.svg

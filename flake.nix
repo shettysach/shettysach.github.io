@@ -72,7 +72,11 @@
 
           devShells.default = mkShell {
             inputsFrom = [bin];
-            buildInputs = [pkgs.miniserve];
+            buildInputs = [
+              pkgs.miniserve
+              pkgs.xmlformat
+              pkgs.cargo-flamegraph
+            ];
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
             CARGO_BUILD_RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold";
           };
