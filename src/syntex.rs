@@ -1,4 +1,4 @@
-use std::mem::take;
+use std::{mem::take, sync::OnceLock};
 
 use anyhow::{Error, Result};
 use pulldown_cmark::{
@@ -7,7 +7,7 @@ use pulldown_cmark::{
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
-    parsing::{SyntaxReference, SyntaxSet},
+    parsing::SyntaxSet,
 };
 use yaml_rust2::{Yaml, YamlLoader};
 
@@ -17,6 +17,8 @@ pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(Options::ENABLE_MATH)
     .union(Options::ENABLE_HEADING_ATTRIBUTES);
+
+static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 
 pub(crate) struct Article<'a> {
     pub(crate) metadata: Metadata,
@@ -31,7 +33,7 @@ pub(crate) struct Metadata {
 }
 
 pub(crate) trait Syntex<'a> {
-    fn process(self, syntax_set: &SyntaxSet) -> Result<Article<'a>>;
+    fn process(self) -> Result<Article<'a>>;
 }
 
 struct Heading<'a> {
@@ -42,10 +44,8 @@ struct Heading<'a> {
 }
 
 impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
-    fn process(self: pulldown_cmark::Parser<'a>, syntax_set: &SyntaxSet) -> Result<Article<'a>> {
-        let plain_text = syntax_set.find_syntax_plain_text();
-
-        let mut syntax = plain_text;
+    fn process(self: pulldown_cmark::Parser<'a>) -> Result<Article<'a>> {
+        let mut syntax_token: Option<CowStr> = None;
         let mut storage = Storage::new();
 
         let mut capture = false;
@@ -109,16 +109,14 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
 
                 Event::Start(Tag::CodeBlock(kind)) => {
                     capture = true;
-                    syntax = match kind {
-                        CodeBlockKind::Fenced(lang) => {
-                            syntax_set.find_syntax_by_token(&lang).unwrap_or(plain_text)
-                        }
-                        CodeBlockKind::Indented => plain_text,
+                    syntax_token = match kind {
+                        CodeBlockKind::Fenced(lang) => Some(lang),
+                        CodeBlockKind::Indented => None,
                     };
                 }
 
                 Event::End(TagEnd::CodeBlock) => {
-                    let highlighted = highlight_code(&captive_string, syntax, syntax_set)?;
+                    let highlighted = highlight_code(&captive_string, syntax_token.as_deref())?;
                     let event = Event::Html(CowStr::from(highlighted));
                     events.push(event);
 
@@ -183,7 +181,12 @@ fn latex_to_mathml(
     Ok(mathml)
 }
 
-fn highlight_code(code: &str, syntax: &SyntaxReference, syntax_set: &SyntaxSet) -> Result<String> {
+fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
+    let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
+    let syntax = syntax_token
+        .and_then(|t| syntax_set.find_syntax_by_token(t))
+        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
+
     let mut class_gen =
         ClassedHTMLGenerator::new_with_class_style(syntax, syntax_set, ClassStyle::Spaced);
 

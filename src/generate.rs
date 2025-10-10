@@ -6,7 +6,6 @@ use pulldown_cmark::{
     Parser,
     html::{self, push_html},
 };
-use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
 use crate::atom::{FeedEntry, generate_atom_feed};
@@ -15,12 +14,7 @@ use crate::syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata};
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
 
-fn render_markdown(
-    src: &Path,
-    dst: &Path,
-    html_dir: &Path,
-    syntax_set: &SyntaxSet,
-) -> Result<Metadata> {
+fn render_markdown(src: &Path, dst: &Path, html_dir: &Path) -> Result<Metadata> {
     let markdown = fs::read_to_string(src)?;
 
     if dst.exists() && dst.metadata()?.modified()? > src.metadata()?.modified()? {
@@ -31,7 +25,7 @@ fn render_markdown(
         events,
         metadata,
         toc,
-    } = Parser::new_ext(&markdown, OPTIONS).process(syntax_set)?;
+    } = Parser::new_ext(&markdown, OPTIONS).process()?;
 
     let rel_path = dst.strip_prefix(html_dir).unwrap().to_string_lossy();
 
@@ -57,12 +51,10 @@ fn render_markdown(
 }
 
 pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
-    let syntax_set = SyntaxSet::load_defaults_newlines();
-
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
     let Article {
         metadata, events, ..
-    } = Parser::new_ext(&index_md, OPTIONS).process(&syntax_set)?;
+    } = Parser::new_ext(&index_md, OPTIONS).process()?;
 
     let md_len = index_md.len();
     let est_size = HEADER.len() + FOOTER.len() + md_len + (md_len >> 1);
@@ -93,7 +85,7 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             }
 
             let html_dst = dst_path.with_extension("html");
-            let metadata = render_markdown(src_path, &html_dst, html_dir, &syntax_set)?;
+            let metadata = render_markdown(src_path, &html_dst, html_dir)?;
             let link = rel_path.with_extension("html");
 
             let modified = src_path.metadata()?.modified()?;

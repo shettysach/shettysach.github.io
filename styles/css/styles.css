@@ -92,8 +92,6 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--object-properties);
   margin-bottom: 1rem;
 }
-  color: var(--variables-class-names);
-}
 
 pre {
   font-family: "JetBrains Mono", monospace;
