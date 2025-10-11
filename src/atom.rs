@@ -1,139 +1,108 @@
-use std::{fs, path::Path};
-
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use xxhash_rust::xxh32::Xxh32;
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::writer::Writer;
+use std::fs;
+use std::path::Path;
 
-pub struct FeedEntry {
-    pub title: String,
-    pub link: String,
-    pub updated: DateTime<Utc>,
-    pub summary: Option<String>,
+pub(crate) struct Atom {
+    pub(crate) title: String,
+    pub(crate) subtitle: Option<String>,
+    pub(crate) datetime: DateTime<Utc>,
+    pub(crate) url: String,
 }
 
-fn escape_xml(s: &str) -> String {
-    s.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&apos;")
-}
+pub(crate) fn generate_atom_feed(entries: Vec<Atom>, path: &Path) -> Result<()> {
+    let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
-pub fn generate_atom_feed(
-    entries: Vec<FeedEntry>,
-    feed_title: &str,
-    feed_link: &str,
-    output_path: &Path,
-) -> Result<()> {
-    let mut hasher = Xxh32::new(0);
+    writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
 
-    hasher.update(feed_title.as_bytes());
-    hasher.update(feed_link.as_bytes());
+    let mut feed_start = BytesStart::new("feed");
+    feed_start.push_attribute(("xmlns", "http://www.w3.org/2005/Atom"));
+    writer.write_event(Event::Start(feed_start))?;
 
-    for entry in &entries {
-        hasher.update(entry.title.as_bytes());
-        hasher.update(entry.link.as_bytes());
-        hasher.update(&entry.updated.timestamp().to_le_bytes());
-        if let Some(ref summary) = entry.summary {
-            hasher.update(summary.as_bytes());
-        }
-    }
-    let input_hash = hasher.digest();
+    // author
+    writer.write_event(Event::Start(BytesStart::new("author")))?;
 
-    let cache_dir = output_path
-        .parent()
-        .unwrap_or(Path::new("."))
-        .join(".cache");
-    fs::create_dir_all(&cache_dir)?;
-    let cache_hash_path = cache_dir.join("atom.hash");
+    writer.write_event(Event::Start(BytesStart::new("name")))?;
+    writer.write_event(Event::Text(BytesText::new("Sachith Shetty")))?;
+    writer.write_event(Event::End(BytesEnd::new("name")))?;
 
-    // Check if cache is valid
-    if cache_hash_path.exists() {
-        if let Ok(cached_hash_bytes) = fs::read(&cache_hash_path) {
-            if cached_hash_bytes.len() == 4 {
-                let cached_hash = u32::from_le_bytes(cached_hash_bytes.try_into().unwrap());
-                if cached_hash == input_hash {
-                    // Cache hit, output is already up to date
-                    return Ok(());
-                }
-            }
-        }
-    }
+    writer.write_event(Event::Start(BytesStart::new("email")))?;
+    writer.write_event(Event::Text(BytesText::new("shettysachith47@gmail.com")))?;
+    writer.write_event(Event::End(BytesEnd::new("email")))?;
 
-    let mut xml_content = String::new();
+    writer.write_event(Event::End(BytesEnd::new("author")))?;
 
-    // XML declaration
-    xml_content.push_str("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+    // title
+    writer.write_event(Event::Start(BytesStart::new("title")))?;
+    writer.write_event(Event::Text(BytesText::new("Sachith's Blog")))?;
+    writer.write_event(Event::End(BytesEnd::new("title")))?;
 
-    // Start feed element
-    xml_content.push_str("<feed xmlns=\"http://www.w3.org/2005/Atom\">\n");
+    // id
+    writer.write_event(Event::Start(BytesStart::new("id")))?;
+    writer.write_event(Event::Text(BytesText::new("https://shettysach.github.io/")))?;
+    writer.write_event(Event::End(BytesEnd::new("id")))?;
 
-    // Feed title
-    xml_content.push_str(&format!("  <title>{}</title>\n", escape_xml(feed_title)));
+    // link
+    let mut link = BytesStart::new("link");
+    link.push_attribute(("href", "https://shettysach.github.io/atom.xml"));
+    link.push_attribute(("rel", "self"));
+    writer.write_event(Event::Empty(link))?;
 
-    // Feed link
-    xml_content.push_str(&format!(
-        "  <link href=\"{}\" rel=\"alternate\" type=\"text/html\"/>\n",
-        escape_xml(feed_link)
-    ));
+    // updated - latest
+    let now = Utc::now();
+    let latest = entries.iter().map(|a| &a.datetime).max().unwrap_or(&now);
+    writer.write_event(Event::Start(BytesStart::new("updated")))?;
+    writer.write_event(Event::Text(BytesText::new(&latest.to_rfc3339())))?;
+    writer.write_event(Event::End(BytesEnd::new("updated")))?;
 
-    // Feed id
-    xml_content.push_str(&format!("  <id>{}</id>\n", escape_xml(feed_link)));
+    // entries
+    for Atom {
+        title,
+        subtitle,
+        datetime: date,
+        url,
+    } in entries
+    {
+        writer.write_event(Event::Start(BytesStart::new("entry")))?;
 
-    // Feed updated
-    let latest_updated = entries
-        .iter()
-        .map(|e| e.updated)
-        .max()
-        .unwrap_or_else(Utc::now);
-    xml_content.push_str(&format!(
-        "  <updated>{}</updated>\n",
-        latest_updated.to_rfc3339()
-    ));
+        // title
+        writer.write_event(Event::Start(BytesStart::new("title")))?;
+        writer.write_event(Event::Text(BytesText::new(&title)))?;
+        writer.write_event(Event::End(BytesEnd::new("title")))?;
 
-    // Entries
-    for entry in entries {
-        xml_content.push_str("  <entry>\n");
+        // id - use url
+        let url = format!("https://shettysach.github.io/{}", url);
+        writer.write_event(Event::Start(BytesStart::new("id")))?;
+        writer.write_event(Event::Text(BytesText::new(&url)))?;
+        writer.write_event(Event::End(BytesEnd::new("id")))?;
 
-        // Entry title
-        xml_content.push_str(&format!(
-            "    <title>{}</title>\n",
-            escape_xml(&entry.title)
-        ));
+        // updated
+        writer.write_event(Event::Start(BytesStart::new("updated")))?;
+        writer.write_event(Event::Text(BytesText::new(&date.to_rfc3339())))?;
+        writer.write_event(Event::End(BytesEnd::new("updated")))?;
 
-        // Entry link
-        xml_content.push_str(&format!(
-            "    <link href=\"{}\" rel=\"alternate\" type=\"text/html\"/>\n",
-            escape_xml(&entry.link)
-        ));
+        // link
+        let mut link = BytesStart::new("link");
+        link.push_attribute(("href", url.as_str()));
+        writer.write_event(Event::Empty(link))?;
 
-        // Entry id
-        xml_content.push_str(&format!("    <id>{}</id>\n", escape_xml(&entry.link)));
-
-        // Entry updated
-        xml_content.push_str(&format!(
-            "    <updated>{}</updated>\n",
-            entry.updated.to_rfc3339()
-        ));
-
-        // Entry summary (optional)
-        if let Some(summary) = entry.summary {
-            xml_content.push_str(&format!(
-                "    <summary>{}</summary>\n",
-                escape_xml(&summary)
-            ));
+        // summary
+        if let Some(sub) = &subtitle {
+            writer.write_event(Event::Start(BytesStart::new("summary")))?;
+            writer.write_event(Event::Text(BytesText::new(sub)))?;
+            writer.write_event(Event::End(BytesEnd::new("summary")))?;
         }
 
-        xml_content.push_str("  </entry>\n");
+        writer.write_event(Event::End(BytesEnd::new("entry")))?;
     }
 
-    // End feed
-    xml_content.push_str("</feed>\n");
+    writer.write_event(Event::End(BytesEnd::new("feed")))?;
 
-    fs::write(output_path, &xml_content)?;
-
-    // Write hash to cache
-    fs::write(&cache_hash_path, input_hash.to_le_bytes())?;
+    let xml = writer.into_inner();
+    fs::write(path, xml)?;
 
     Ok(())
 }
+

@@ -1,11 +1,10 @@
-use std::path::Path;
-
-use anyhow::Result;
-
 mod atom;
 mod generate;
 mod syntex;
 mod utils;
+
+use anyhow::Result;
+use std::path::Path;
 
 fn main() -> Result<()> {
     let input_dir = Path::new("markdown");

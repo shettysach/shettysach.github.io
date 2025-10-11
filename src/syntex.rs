@@ -1,17 +1,15 @@
-use std::{mem::take, sync::OnceLock};
-
+use crate::utils::Slugger;
 use anyhow::{Error, Result};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Tag, TagEnd,
 };
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
+use std::{mem::take, sync::OnceLock};
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::SyntaxSet,
 };
 use yaml_rust2::{Yaml, YamlLoader};
-
-use crate::utils::Slugger;
 
 pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
@@ -26,6 +24,7 @@ pub(crate) struct Article<'a> {
     pub(crate) toc: Option<String>,
 }
 
+#[derive(Clone)]
 pub(crate) struct Metadata {
     pub(crate) title: String,
     pub(crate) subtitle: Option<String>,
@@ -34,13 +33,6 @@ pub(crate) struct Metadata {
 
 pub(crate) trait Syntex<'a> {
     fn process(self) -> Result<Article<'a>>;
-}
-
-struct Heading<'a> {
-    level: HeadingLevel,
-    id: Option<CowStr<'a>>,
-    classes: Vec<CowStr<'a>>,
-    attrs: Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
 }
 
 impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
@@ -72,23 +64,14 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                     classes,
                     attrs,
                 }) if toc.is_some() => {
-                    captive_heading = Some(Heading {
-                        level,
-                        id,
-                        classes,
-                        attrs,
-                    });
+                    captive_heading = Some((level, id, classes, attrs));
                     capture = true;
                 }
 
                 Event::End(TagEnd::Heading(_)) => {
                     if let Some(table) = toc.as_mut() {
-                        let Heading {
-                            level,
-                            id,
-                            classes,
-                            attrs,
-                        } = unsafe { captive_heading.take().unwrap_unchecked() };
+                        let (level, id, classes, attrs) =
+                            unsafe { captive_heading.take().unwrap_unchecked() };
                         capture = false;
 
                         let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&captive_string)));
@@ -216,19 +199,13 @@ fn parse_metadata(docs: Vec<Yaml>) -> Option<(Metadata, bool)> {
     ))
 }
 
-pub(crate) fn extract_metadata(markdown: &str) -> Result<Metadata> {
-    let start = markdown
-        .find("---\n")
-        .ok_or_else(|| Error::msg("No frontmatter found"))?;
+pub(crate) fn extract_metadata(markdown: &str) -> Option<Metadata> {
+    let start = markdown.find("---\n")?;
     let rest = &markdown[start + 4..];
-    let end = rest
-        .find("\n---\n")
-        .ok_or_else(|| Error::msg("Invalid frontmatter"))?;
+    let end = rest.find("\n---\n")?;
     let yaml_str = &rest[..end];
-    let docs = YamlLoader::load_from_str(yaml_str)?;
-    parse_metadata(docs)
-        .ok_or_else(|| Error::msg("Failed to parse metadata"))
-        .map(|x| x.0)
+    let docs = YamlLoader::load_from_str(yaml_str).ok()?;
+    parse_metadata(docs).map(|x| x.0)
 }
 
 pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor_id: &str) -> String {

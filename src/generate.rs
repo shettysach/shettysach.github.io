@@ -1,15 +1,12 @@
-use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
-
+use crate::{
+    atom::Atom,
+    syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata},
+};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{
-    Parser,
-    html::{self, push_html},
-};
+use pulldown_cmark::{Parser, html::push_html};
+use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
 use walkdir::WalkDir;
-
-use crate::atom::{FeedEntry, generate_atom_feed};
-use crate::syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata};
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
@@ -18,7 +15,8 @@ fn render_markdown(src: &Path, dst: &Path, html_dir: &Path) -> Result<Metadata> 
     let markdown = fs::read_to_string(src)?;
 
     if dst.exists() && dst.metadata()?.modified()? > src.metadata()?.modified()? {
-        return extract_metadata(&markdown);
+        return extract_metadata(&markdown)
+            .with_context(|| format!("Invalid frontmatter, {}", src.to_string_lossy()));
     }
 
     let Article {
@@ -42,7 +40,7 @@ fn render_markdown(src: &Path, dst: &Path, html_dir: &Path) -> Result<Metadata> 
         html.push_str("</details>");
     }
 
-    html::push_html(&mut html, events.into_iter());
+    push_html(&mut html, events.into_iter());
     html.push_str(FOOTER);
 
     fs::write(dst, html)?;
@@ -61,18 +59,18 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let mut index_html = String::with_capacity(est_size);
 
     index_html.push_str(&metadata.header(""));
-    html::push_html(&mut index_html, events.into_iter());
+    push_html(&mut index_html, events.into_iter());
     index_html.push_str("<ul>\n");
 
-    let walker = WalkDir::new(markdown_dir)
-        .into_iter()
-        .filter_map(Result::ok);
-
-    // TODO: Estimate no. of tags somehow
+    // TODO: Estimate no. of tags
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
+    let mut atom_entries = Vec::new();
 
-    // TODO: walker.count() consumes it
-    let mut feed_entries: Vec<FeedEntry> = Vec::with_capacity(10);
+    let walker = WalkDir::new(markdown_dir)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name() != "index.md");
 
     for entry in walker {
         let src_path = entry.path();
@@ -80,25 +78,12 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         let dst_path = html_dir.join(rel_path);
 
         if src_path.extension().is_some_and(|ext| ext == "md") {
-            if src_path.file_name().is_some_and(|name| name == "index.md") {
-                continue;
-            }
+            let dst_html = dst_path.with_extension("html");
+            let metadata = render_markdown(src_path, &dst_html, html_dir)?;
 
-            let html_dst = dst_path.with_extension("html");
-            let metadata = render_markdown(src_path, &html_dst, html_dir)?;
-            let link = rel_path.with_extension("html");
+            let rel_html = rel_path.with_extension("html");
+            let label_rc = Rc::new(metadata.label(&rel_html));
 
-            let modified = src_path.metadata()?.modified()?;
-            let updated = DateTime::<Utc>::from(modified);
-
-            feed_entries.push(FeedEntry {
-                title: metadata.title.clone(),
-                link: link.to_string_lossy().to_string(),
-                updated,
-                summary: metadata.subtitle.clone(),
-            });
-
-            let label_rc = Rc::new(metadata.label(&link));
             let mut label = (*label_rc).clone();
 
             if let Some(tags) = metadata.tags {
@@ -116,6 +101,13 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
                 }
             }
 
+            atom_entries.push(Atom {
+                title: metadata.title,
+                subtitle: metadata.subtitle,
+                datetime: DateTime::<Utc>::from(src_path.metadata()?.modified()?),
+                url: rel_path.to_string_lossy().to_string(),
+            });
+
             writeln!(index_html, "<li>{}</li>", label)?;
         } else if src_path.is_dir() {
             fs::create_dir_all(&dst_path)?
@@ -127,15 +119,9 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     index_html.push_str("</ul>\n");
     index_html.push_str(FOOTER);
 
-    fs::write(html_dir.join("index.html"), index_html)
-        .with_context(|| "Failed to write index.html")?;
+    fs::write(html_dir.join("index.html"), index_html)?;
 
-    generate_atom_feed(
-        feed_entries,
-        "Sachith Shetty's Blog",
-        "index.html",
-        &html_dir.join("atom.xml"),
-    )?;
+    crate::atom::generate_atom_feed(atom_entries, &html_dir.join("atom.xml"))?;
 
     tags_page(tags_map, &html_dir.join("tags.html"))?;
 
@@ -176,20 +162,17 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
 
 impl Metadata {
     fn header(&self, url: &str) -> String {
+        let description = self.subtitle.as_deref().unwrap_or("Blogpost");
+        let tags = &self
+            .tags
+            .as_ref()
+            .map(|tags| tags.join(", ")) // NOTE: Use CoW? negligible?
+            .unwrap_or_else(|| "blog, blogpost, article".to_string());
+
         HEADER
             .replace("{{TITLE}}", &self.title)
-            .replace(
-                "{{DESCRIPTION}}",
-                self.subtitle.as_deref().unwrap_or("Blogpost"),
-            )
-            .replace(
-                "{{TAGS}}",
-                &self
-                    .tags
-                    .as_ref()
-                    .map(|tags| tags.join(", "))
-                    .unwrap_or_else(|| "blog, blogpost".to_string()),
-            )
+            .replace("{{DESCRIPTION}}", description)
+            .replace("{{TAGS}}", tags)
             .replace("{{URL}}", url)
     }
 

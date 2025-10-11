@@ -1,7 +1,6 @@
-use std::{fs, io::BufReader, path::Path};
-
 use anyhow::Result;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use std::{fs, io::BufReader, path::Path};
 use syntect::{
     highlighting::ThemeSet,
     html::{ClassStyle, css_for_theme_with_class_style},
