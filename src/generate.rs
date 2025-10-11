@@ -1,20 +1,25 @@
 use crate::{
-    atom::Atom,
+    atom::{Atom, generate_atom_feed},
     syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use pulldown_cmark::{Parser, html::push_html};
-use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc};
+use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc, time::SystemTime};
 use walkdir::WalkDir;
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
 
-fn render_markdown(src: &Path, dst: &Path, html_dir: &Path) -> Result<Metadata> {
+fn render_markdown(
+    src: &Path,
+    dst: &Path,
+    modified: SystemTime,
+    rel_url: &str,
+) -> Result<Metadata> {
     let markdown = fs::read_to_string(src)?;
 
-    if dst.exists() && dst.metadata()?.modified()? > src.metadata()?.modified()? {
+    if dst.exists() && dst.metadata()?.modified()? > modified {
         return extract_metadata(&markdown)
             .with_context(|| format!("Invalid frontmatter, {}", src.to_string_lossy()));
     }
@@ -25,13 +30,11 @@ fn render_markdown(src: &Path, dst: &Path, html_dir: &Path) -> Result<Metadata> 
         toc,
     } = Parser::new_ext(&markdown, OPTIONS).process()?;
 
-    let rel_path = dst.strip_prefix(html_dir).unwrap().to_string_lossy();
-
     let md_len = markdown.len();
     let est_size = HEADER.len() + FOOTER.len() + md_len + (md_len >> 1);
     let mut html = String::with_capacity(est_size);
 
-    html.push_str(&metadata.header(&rel_path));
+    html.push_str(&metadata.header(rel_url));
 
     if let Some(table) = toc {
         let table = Parser::new(&table);
@@ -64,25 +67,35 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     // TODO: Estimate no. of tags
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
-    let mut atom_entries = Vec::new();
 
-    let walker = WalkDir::new(markdown_dir)
+    // NOTE: Estimate, cases - same dir 2mds
+    let est_count = WalkDir::new(markdown_dir)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(Result::ok)
+        .count()
+        - 2;
+    let mut atom_entries = Vec::with_capacity(est_count);
+
+    for entry in WalkDir::new(markdown_dir)
+        .max_depth(2)
         .sort_by_file_name()
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|e| e.file_name() != "index.md");
-
-    for entry in walker {
+        .filter(|e| e.file_name() != "index.md")
+    {
         let src_path = entry.path();
         let rel_path = src_path.strip_prefix(markdown_dir)?;
         let dst_path = html_dir.join(rel_path);
 
         if src_path.extension().is_some_and(|ext| ext == "md") {
             let dst_html = dst_path.with_extension("html");
-            let metadata = render_markdown(src_path, &dst_html, html_dir)?;
-
+            let modified = src_path.metadata()?.modified()?;
             let rel_html = rel_path.with_extension("html");
-            let label_rc = Rc::new(metadata.label(&rel_html));
+            let rel_url = rel_html.to_str().with_context(|| "Path not UTF8")?;
+
+            let metadata = render_markdown(src_path, &dst_html, modified, rel_url)?;
+            let label_rc = Rc::new(metadata.label(rel_url));
 
             let mut label = (*label_rc).clone();
 
@@ -101,14 +114,14 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
                 }
             }
 
+            writeln!(index_html, "<li>{}</li>", label)?;
+
             atom_entries.push(Atom {
                 title: metadata.title,
                 subtitle: metadata.subtitle,
-                datetime: DateTime::<Utc>::from(src_path.metadata()?.modified()?),
-                url: rel_path.to_string_lossy().to_string(),
+                datetime: DateTime::<Utc>::from(modified),
+                url: rel_url.to_string(),
             });
-
-            writeln!(index_html, "<li>{}</li>", label)?;
         } else if src_path.is_dir() {
             fs::create_dir_all(&dst_path)?
         } else {
@@ -121,9 +134,9 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     fs::write(html_dir.join("index.html"), index_html)?;
 
-    crate::atom::generate_atom_feed(atom_entries, &html_dir.join("atom.xml"))?;
-
     tags_page(tags_map, &html_dir.join("tags.html"))?;
+
+    generate_atom_feed(atom_entries, &html_dir.join("atom.xml"))?;
 
     Ok(())
 }
@@ -176,12 +189,8 @@ impl Metadata {
             .replace("{{URL}}", url)
     }
 
-    fn label(&self, link: &Path) -> String {
-        let mut label = format!(
-            "<h2><a href=\"{}\">{}</a></h2>",
-            link.to_string_lossy(),
-            self.title
-        );
+    fn label(&self, link: &str) -> String {
+        let mut label = format!("<h2><a href=\"{}\">{}</a></h2>", link, self.title);
 
         if let Some(subtitle) = &self.subtitle {
             label.push_str(subtitle);
