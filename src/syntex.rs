@@ -1,7 +1,7 @@
 use crate::utils::Slugger;
 use anyhow::{Error, Result};
 use pulldown_cmark::{
-    CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Tag, TagEnd,
+    CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
 };
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
 use std::{mem::take, sync::OnceLock};
@@ -35,16 +35,17 @@ pub(crate) trait Syntex<'a> {
     fn process(self) -> Result<Article<'a>>;
 }
 
-impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
-    fn process(self: pulldown_cmark::Parser<'a>) -> Result<Article<'a>> {
+impl<'a> Syntex<'a> for Parser<'a> {
+    fn process(self: Parser<'a>) -> Result<Article<'a>> {
         let mut syntax_token: Option<CowStr> = None;
         let mut storage = Storage::new();
 
-        let mut capture = false;
         let mut toc: Option<String> = None;
 
+        let mut capture = false;
         let mut captive_string = String::new();
         let mut captive_heading = None;
+        let mut captive_events: Vec<Event<'a>> = Vec::new();
 
         let mut metadata_init = None;
 
@@ -54,9 +55,12 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
 
         for event in self {
             match event {
-                Event::Text(t) if capture => captive_string.push_str(&t),
-
-                Event::Text(t) => events.push(Event::Html(t)),
+                Event::Text(t) if capture => {
+                    captive_string.push_str(&t);
+                    if captive_heading.is_some() {
+                        captive_events.push(Event::Text(t));
+                    }
+                }
 
                 Event::Start(Tag::Heading {
                     level,
@@ -74,9 +78,9 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                             unsafe { captive_heading.take().unwrap_unchecked() };
                         capture = false;
 
-                        let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&captive_string)));
-
-                        table.push_str(&table_bullet(level, &captive_string, &id));
+                        let header_text = take(&mut captive_string);
+                        let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&header_text)));
+                        table.push_str(&table_bullet(level, &header_text, &id));
 
                         events.push(Event::Start(Tag::Heading {
                             level,
@@ -84,10 +88,17 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                             classes,
                             attrs,
                         }));
-                        events.push(Event::Html(CowStr::from(take(&mut captive_string))));
+
+                        events.append(&mut captive_events);
+                        captive_events.clear();
                     }
 
                     events.push(event);
+                }
+
+                Event::Code(code) if captive_heading.is_some() => {
+                    captive_string.push_str(&code);
+                    captive_events.push(Event::Code(code));
                 }
 
                 Event::Start(Tag::CodeBlock(kind)) => {
@@ -116,7 +127,13 @@ impl<'a> Syntex<'a> for pulldown_cmark::Parser<'a> {
                 Event::InlineMath(latex) => {
                     let mathml = latex_to_mathml(&latex, &mut storage, DisplayMode::Inline)?;
                     let event = Event::InlineHtml(CowStr::from(mathml));
-                    events.push(event);
+
+                    if captive_heading.is_some() {
+                        captive_string.push_str(&latex);
+                        captive_events.push(event);
+                    } else {
+                        events.push(event);
+                    }
                 }
 
                 Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle)) => capture = true,

@@ -1,10 +1,10 @@
 use crate::{
-    atom::{Atom, generate_atom_feed},
-    syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata},
+    atom::{generate_atom_feed, Atom},
+    syntex::{extract_metadata, Article, Metadata, Syntex, OPTIONS},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{Parser, html::push_html};
+use pulldown_cmark::{html::push_html, Parser};
 use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc, time::SystemTime};
 use walkdir::WalkDir;
 
@@ -69,12 +69,7 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
 
     // NOTE: Estimate, cases - same dir 2mds
-    let est_count = WalkDir::new(markdown_dir)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(Result::ok)
-        .count()
-        - 2;
+    let est_count = WalkDir::new(markdown_dir).max_depth(1).into_iter().count() - 4;
     let mut atom_entries = Vec::with_capacity(est_count);
 
     for entry in WalkDir::new(markdown_dir)
@@ -150,7 +145,7 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
 
     article_html.push_str(
         &HEADER
-            .replace("{{TITLE}}", "Tags | Sachith Shetty")
+            .replace("{{TITLE}}", "Tags")
             .replace("{{DESCRIPTION}}", "Page for tags and tagged articles")
             .replace("{{TAGS}}", "blog, blogpost, tags")
             .replace("{{URL}}", "tags.html"),

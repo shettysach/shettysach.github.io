@@ -16,15 +16,18 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
         let rel_path = source.strip_prefix(src)?;
         let target = dst.join(rel_path);
 
-        if entry.file_type().is_dir() && !target.exists() {
-            fs::create_dir_all(&target)?;
-        } else if entry.file_type().is_file()
+        if entry.file_type().is_file()
             && (!target.exists()
                 || entry.metadata()?.modified()? > target.metadata()?.modified()?)
         {
             fs::copy(source, &target)?;
         }
+
+        // else if entry.file_type().is_dir() && !target.exists() {
+        //     fs::create_dir_all(&target)?;
+        // }
     }
+
     Ok(())
 }
 
@@ -32,7 +35,7 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
 
 #[allow(dead_code)]
 pub(crate) fn generate_code_css(styles_dir: &Path) -> Result<()> {
-    let code_css_path = styles_dir.join("css").join("code.css");
+    let code_css_path = styles_dir.join("syntax.css");
 
     if !code_css_path.exists() {
         let file = fs::File::open("./Enki-Tokyo-Night.tmTheme")?;
@@ -82,17 +85,18 @@ fn hash_str(slug: &str) -> u32 {
 
 fn slugify(s: &str) -> String {
     let mut last_dash = true;
-    s.chars()
-        .filter_map(|c| {
-            if c.is_alphanumeric() {
-                last_dash = false;
-                Some(c.to_ascii_lowercase())
-            } else if !last_dash {
-                last_dash = true;
-                Some('-')
-            } else {
-                None
-            }
-        })
-        .collect()
+    let iter = s.chars();
+
+    iter.filter_map(|c| {
+        if c.is_alphanumeric() {
+            last_dash = false;
+            Some(c.to_ascii_lowercase())
+        } else if c.is_whitespace() && !last_dash {
+            last_dash = true;
+            Some('-')
+        } else {
+            None
+        }
+    })
+    .collect()
 }

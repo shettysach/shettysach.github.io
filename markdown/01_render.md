@@ -11,8 +11,8 @@ toc: true
 
 # Rendering math and highlighting code
 
-This section explains how the blog renders math and highlights syntax, using only static HTML and CSS.
-The relevant code for this section is located [`here`](https://github.com/shettysach/shettysach.github.io/blob/main/src/syntex.rs).
+This article explains how the blog renders math and highlights syntax, using static HTML and CSS.
+The relevant code for this section can be found [here](https://github.com/shettysach/shettysach.github.io/blob/main/src/syntex.rs).
 
 ---
 
@@ -44,9 +44,9 @@ MathML Core is a subset with increased implementation details based on rules fro
 ```
 _MathML representation of the above equation_
 
-To convert from LaTeX to MathML, [`pulldown_cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math and code sections. When `pulldown-cmark` parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown_latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is added to the output events vector and the math is rendered. 
+To convert from LaTeX to MathML, [`pulldown_cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math and code sections. When `pulldown-cmark` parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown_latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is added to the output events and the math is rendered. 
 
-Sum of cubes of the first $n$ natural numbers $\mathbb{N}$
+Sum of cubes of the first $n$ natural numbers
 
 $$
 \sum_{i=1}^{n} i^3 = \left( \frac{n(n+1)}{2} \right) ^2
@@ -56,37 +56,37 @@ $$
 
 There are two types of math displays,
 
-#### Inline display
+#### Inline display - $F(n) = n^2$
 
-$F(n)$, written as
+Written as
 
-  ```
-  $F(n)$
-  ```
+```latex
+$F(n) = n^2$
+```
 
 #### Block display
 
-  $$
-  F(n) =
-  \begin{cases}
-  0 & \text{if } n = 0, \\
-  1 & \text{if } n = 1, \\
-  F(n-1) + F(n-2) & \text{if } n \geq 2.
-  \end{cases}
-  $$
+$$
+F(n) =
+\begin{cases}
+0 & \text{if } n = 0, \\
+1 & \text{if } n = 1, \\
+F(n-1) + F(n-2) & \text{if } n \geq 2.
+\end{cases}
+$$
 
-  written as
-    
-  ```tex
-  $$
-  F(n) =
-  \begin{cases}
-  0 & \text{if } n = 0, \\
-  1 & \text{if } n = 1, \\
-  F(n-1) + F(n-2) & \text{if } n \geq 2.
-  \end{cases}
-  $$
-  ```
+written as
+  
+```tex
+$$
+F(n) =
+\begin{cases}
+0 & \text{if } n = 0, \\
+1 & \text{if } n = 1, \\
+F(n-1) + F(n-2) & \text{if } n \geq 2.
+\end{cases}
+$$
+```
   
 ---
 
@@ -94,7 +94,7 @@ $F(n)$, written as
 
 ```rust
 fn sum_of_cubes_lhs(n: usize) -> usize {
-    (0..=n).map(|i| i * i * i).sum()
+    (2..=n).map(|i| i * i * i).sum()
 }
 
 fn sum_of_cubes_rhs(n: usize) -> usize {
@@ -112,7 +112,7 @@ When `pulldown-cmark` identifies a codeblock,
 like keywords, variables and constants. This enables for syntax highlighting
 through CSS classes, which makes it easy to have colours assigned to different elements.
 
-`syntect` also generates themes from `.tmTheme` files. This blog uses [`Enki-Tokyo-Night`](https://raw.githubusercontent.com/enkia/enki-theme/refs/heads/master/scheme/Enki-Tokyo-Night.tmTheme) from the [Enki Theme by enkia](https://github.com/enkia/enki-theme).
+`syntect` also generates CSS files from `.tmTheme` files. This blog uses [`Enki-Tokyo-Night`](https://raw.githubusercontent.com/enkia/enki-theme/refs/heads/master/scheme/Enki-Tokyo-Night.tmTheme) from the [Enki Theme by enkia](https://github.com/enkia/enki-theme).
 
 ```html
 <pre><code><span class="source rust"><span class="meta function rust"><span class="meta function rust"><span class="storage type function rust">fn</span> </span><span class="entity name function rust">sum_of_cubes_lhs</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">(</span><span class="variable parameter rust">n</span><span class="punctuation separator rust">:</span> <span class="storage type rust">usize</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters end rust">)</span></span></span></span><span class="meta function rust"> <span class="meta function return-type rust"><span class="punctuation separator rust">-&gt;</span> <span class="storage type rust">usize</span></span> </span><span class="meta function rust"><span class="meta block rust"><span class="punctuation section block begin rust">{</span>
@@ -136,40 +136,40 @@ If no language identifier is provided, the language is treated as plain text.
 
 Similarly, there are two types of code displays,
 
-####  Inline display
+####  Inline display - `fibonacci(5)`
 
-  `fibonacci(5)`, written as
+Written as
 
-  ```
-  `fibonacci(5)`
-  ```
+```
+`fibonacci(5)`
+```
 
 #### Block display
 
-  ```rust
-  // rust
-  fn fibonacci(n: u32) -> u32 {
-      match n {
-          0 => 0,
-          1 => 1,
-          _ => fibonacci(n - 1) + fibonacci(n - 2),
-      }
-  }
-  ```
-  
-  written as
-  
-  ````
-  ```rust
-  // rust
-  fn fibonacci(n: u32) -> u32 {
-      match n {
-          0 => 0,
-          1 => 1,
-          _ => fibonacci(n - 1) + fibonacci(n - 2),
-      }
-  }
-  ```
-  ````
+```rust
+// rust
+fn fibonacci(n: u32) -> u32 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+```
+
+written as
+
+````
+```rust
+// rust
+fn fibonacci(n: u32) -> u32 {
+    match n {
+        0 => 0,
+        1 => 1,
+        _ => fibonacci(n - 1) + fibonacci(n - 2),
+    }
+}
+```
+````
 
 ---

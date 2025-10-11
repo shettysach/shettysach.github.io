@@ -1,5 +1,5 @@
 ---
-title: Blog
+title: Home
 subtitle: Welcome to my blog
 ---
 
