@@ -16,8 +16,8 @@ These are some of my personal projects.
 
 ## Loxi
 
-[repo](https://github.com/shettysach/loxi),
-[wasm playground](https://shettysach.github.io/Loxi)
+[GitHub](https://github.com/shettysach/loxi),
+[Wasm playground](https://shettysach.github.io/Loxi)
 
 ![loxi](./loxi.png)
 
@@ -32,7 +32,7 @@ These are some of my personal projects.
 
 ## ferrograd
 
-[repo](https://github.com/shettysach/ferrograd)
+[GitHub](https://github.com/shettysach/ferrograd)
 
 <pre class="ascii">
    ___                               _
@@ -63,7 +63,7 @@ These are some of my personal projects.
 
 ## Kannada Handwriting Calculator
 
-[repo](https://github.com/shettysach/Kannada-Handwriting-Calculator)
+[GitHub](https://github.com/shettysach/Kannada-Handwriting-Calculator)
 
 ![demo](https://raw.githubusercontent.com/shettysach/Kannada-Handwriting-Calculator/refs/heads/main/assets/Demo.gif)
 
@@ -94,7 +94,7 @@ These are some of my personal projects.
 
 ## CandleMist
 
-[repo](https://github.com/shettysach/CandleMist)
+[GitHub](https://github.com/shettysach/CandleMist)
 
 <pre class="ascii">
                      (
@@ -126,7 +126,7 @@ These are some of my personal projects.
 
 ## veNum
 
-[repo](https://github.com/shettysach/veNum)
+[GitHub](https://github.com/shettysach/veNum)
 
 <pre class="ascii">
                __
@@ -155,8 +155,8 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ## Termfolio
 
-[repo](https://github.com/shettysach/Termfolio),
-[page](https://shettysach.github.io/Termfolio)
+[GitHub](https://github.com/shettysach/Termfolio),
+[Page](https://shettysach.github.io/Termfolio)
 
 ![ss](./term.png)
 
@@ -177,7 +177,7 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ## Cohle
 
-[repo](https://github.com/shettysach/Cohle)
+[GitHub](https://github.com/shettysach/Cohle)
 
 ![img](https://raw.githubusercontent.com/shettysach/cohle/refs/heads/master/image.png)
 
@@ -191,7 +191,7 @@ __   _____  /\ \ \_   _ _ __ ___
 
 ## Liquid-Oxygen
 
-[repo](https://github.com/shettysach/Liquid-Oxygen)
+[GitHub](https://github.com/shettysach/Liquid-Oxygen)
 
 <pre class="ascii">
 _    _ ____ _  _ _ ___     ____ _  _ _   _ ____ ____ _  _ 
