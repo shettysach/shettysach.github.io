@@ -4,7 +4,7 @@ use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
 };
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
-use std::{mem::take, sync::OnceLock};
+use std::sync::OnceLock;
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::SyntaxSet,
@@ -42,26 +42,27 @@ impl<'a> Syntex<'a> for Parser<'a> {
 
         let mut toc: Option<String> = None;
 
-        let mut capture = false;
-        let mut captive_string = String::new();
+        let mut captive_string: Option<String> = None;
         let mut captive_heading = None;
         let mut captive_events: Vec<Event<'a>> = Vec::new();
 
         let mut metadata_init = None;
 
-        let bound = self.size_hint().1.unwrap_or(20);
+        let bound = 20;
         let mut events = Vec::with_capacity(bound);
         let mut slugger = Slugger::with_capacity(bound / 5);
 
         for event in self {
             match event {
-                Event::Text(t) if capture => {
-                    captive_string.push_str(&t);
-                }
-
-                Event::Text(t) if captive_heading.is_some() => {
-                    captive_string.push_str(&t);
-                    captive_events.push(Event::Text(t));
+                Event::Text(t) => {
+                    if let Some(s) = captive_string.as_mut() {
+                        s.push_str(&t);
+                        if captive_heading.is_some() {
+                            captive_events.push(Event::Text(t));
+                        }
+                    } else {
+                        events.push(Event::Text(t));
+                    }
                 }
 
                 Event::Start(Tag::Heading {
@@ -71,6 +72,7 @@ impl<'a> Syntex<'a> for Parser<'a> {
                     attrs,
                 }) if toc.is_some() => {
                     captive_heading = Some((level, id, classes, attrs));
+                    captive_string = Some(String::new());
                 }
 
                 Event::End(TagEnd::Heading(_)) => {
@@ -78,31 +80,34 @@ impl<'a> Syntex<'a> for Parser<'a> {
                         let (level, id, classes, attrs) =
                             unsafe { captive_heading.take().unwrap_unchecked() };
 
-                        let header_text = take(&mut captive_string);
-                        let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&header_text)));
-                        table.push_str(&table_bullet(level, &header_text, &id));
+                        if let Some(header_text) = captive_string.take() {
+                            let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&header_text)));
+                            table.push_str(&table_bullet(level, &header_text, &id));
 
-                        events.push(Event::Start(Tag::Heading {
-                            level,
-                            id: Some(id),
-                            classes,
-                            attrs,
-                        }));
+                            events.push(Event::Start(Tag::Heading {
+                                level,
+                                id: Some(id),
+                                classes,
+                                attrs,
+                            }));
 
-                        events.append(&mut captive_events);
-                        captive_events.clear();
+                            events.append(&mut captive_events);
+                            captive_events.clear();
+                        }
                     }
 
                     events.push(event);
                 }
 
                 Event::Code(code) if captive_heading.is_some() => {
-                    captive_string.push_str(&code);
+                    if let Some(s) = captive_string.as_mut() {
+                        s.push_str(&code);
+                    }
                     captive_events.push(Event::Code(code));
                 }
 
                 Event::Start(Tag::CodeBlock(kind)) => {
-                    capture = true;
+                    captive_string = Some(String::new());
                     syntax_token = match kind {
                         CodeBlockKind::Fenced(lang) => Some(lang),
                         CodeBlockKind::Indented => None,
@@ -110,12 +115,11 @@ impl<'a> Syntex<'a> for Parser<'a> {
                 }
 
                 Event::End(TagEnd::CodeBlock) => {
-                    let highlighted = highlight_code(&captive_string, syntax_token.as_deref())?;
-                    let event = Event::Html(CowStr::from(highlighted));
-                    events.push(event);
-
-                    capture = false;
-                    captive_string.clear();
+                    if let Some(code) = captive_string.take() {
+                        let highlighted = highlight_code(&code, syntax_token.as_deref())?;
+                        let event = Event::Html(CowStr::from(highlighted));
+                        events.push(event);
+                    }
                 }
 
                 Event::DisplayMath(latex) => {
@@ -129,24 +133,27 @@ impl<'a> Syntex<'a> for Parser<'a> {
                     let event = Event::InlineHtml(CowStr::from(mathml));
 
                     if captive_heading.is_some() {
-                        captive_string.push_str(&latex);
+                        if let Some(s) = captive_string.as_mut() {
+                            s.push_str(&latex);
+                        }
                         captive_events.push(event);
                     } else {
                         events.push(event);
                     }
                 }
 
-                Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle)) => capture = true,
+                Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle)) => {
+                    captive_string = Some(String::new())
+                }
 
                 Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle)) => {
-                    let docs = YamlLoader::load_from_str(&captive_string)?;
+                    if let Some(yaml) = captive_string.take() {
+                        let docs = YamlLoader::load_from_str(&yaml)?;
 
-                    (metadata_init, toc) = parse_metadata(docs)
-                        .map(|(init, has_toc)| (Some(init), has_toc.then(String::new)))
-                        .unwrap_or((None, None));
-
-                    captive_string.clear();
-                    capture = false;
+                        (metadata_init, toc) = parse_metadata(docs)
+                            .map(|(init, has_toc)| (Some(init), has_toc.then(String::new)))
+                            .unwrap_or((None, None));
+                    }
                 }
 
                 _ => events.push(event),
