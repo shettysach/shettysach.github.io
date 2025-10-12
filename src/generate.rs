@@ -1,11 +1,12 @@
 use crate::{
-    atom::{generate_atom_feed, Atom},
-    syntex::{extract_metadata, Article, Metadata, Syntex, OPTIONS},
+    atom::{Atom, generate_atom_feed},
+    syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{html::push_html, Parser};
-use std::{collections::HashMap, fmt::Write, fs, path::Path, rc::Rc, time::SystemTime};
+use pulldown_cmark::{Parser, html::write_html_io};
+use std::io::{BufWriter, Write};
+use std::{collections::HashMap, fs, path::Path, rc::Rc, time::SystemTime};
 use walkdir::WalkDir;
 
 const HEADER: &str = include_str!("../layout/header.html");
@@ -30,23 +31,22 @@ fn render_markdown(
         toc,
     } = Parser::new_ext(&markdown, OPTIONS).process()?;
 
-    let md_len = markdown.len();
-    let est_size = HEADER.len() + FOOTER.len() + md_len + (md_len >> 1);
-    let mut html = String::with_capacity(est_size);
+    let file = fs::File::create(dst)?;
+    let mut writer = BufWriter::new(file);
 
-    html.push_str(&metadata.header(rel_url));
+    writer.write_all(metadata.header(rel_url).as_bytes())?;
 
     if let Some(table) = toc {
         let table = Parser::new(&table);
-        html.push_str("<details><summary> Table of contents </summary>");
-        push_html(&mut html, table);
-        html.push_str("</details>");
+        writer.write_all(b"<details><summary> Table of contents </summary>")?;
+        write_html_io(&mut writer, table)?;
+        writer.write_all(b"</details>")?;
     }
 
-    push_html(&mut html, events.into_iter());
-    html.push_str(FOOTER);
+    write_html_io(&mut writer, events.into_iter())?;
+    writer.write_all(FOOTER.as_bytes())?;
 
-    fs::write(dst, html)?;
+    writer.flush()?;
 
     Ok(metadata)
 }
@@ -57,13 +57,12 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         metadata, events, ..
     } = Parser::new_ext(&index_md, OPTIONS).process()?;
 
-    let md_len = index_md.len();
-    let est_size = HEADER.len() + FOOTER.len() + md_len + (md_len >> 1);
-    let mut index_html = String::with_capacity(est_size);
+    let file = fs::File::create(html_dir.join("index.html"))?;
+    let mut writer = BufWriter::new(file);
 
-    index_html.push_str(&metadata.header(""));
-    push_html(&mut index_html, events.into_iter());
-    index_html.push_str("<ul>\n");
+    writer.write_all(metadata.header("").as_bytes())?;
+    write_html_io(&mut writer, events.into_iter())?;
+    writer.write_all(b"<ul>\n")?;
 
     // TODO: Estimate no. of tags
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
@@ -77,7 +76,7 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         .sort_by_file_name()
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|e| e.file_name() != "index.md")
+        .filter(|e| e.file_name() != "index.md" && e.path() != markdown_dir)
     {
         let src_path = entry.path();
         let rel_path = src_path.strip_prefix(markdown_dir)?;
@@ -109,7 +108,7 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
                 }
             }
 
-            writeln!(index_html, "<li>{}</li>", label)?;
+            writer.write_all(format!("<li>{}</li>\n", label).as_bytes())?;
 
             atom_entries.push(Atom {
                 title: metadata.title,
@@ -118,16 +117,17 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
                 url: rel_url.to_string(),
             });
         } else if src_path.is_dir() {
-            fs::create_dir_all(&dst_path)?
+            if !dst_path.exists() {
+                fs::create_dir(&dst_path)?;
+            }
         } else {
             fs::copy(src_path, dst_path)?;
         }
     }
 
-    index_html.push_str("</ul>\n");
-    index_html.push_str(FOOTER);
-
-    fs::write(html_dir.join("index.html"), index_html)?;
+    writer.write_all(b"</ul>\n")?;
+    writer.write_all(FOOTER.as_bytes())?;
+    writer.flush()?;
 
     tags_page(tags_map, &html_dir.join("tags.html"))?;
 
@@ -140,30 +140,29 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
-    let est_size = HEADER.len() + FOOTER.len() + tags.len() * 200;
-    let mut article_html = String::with_capacity(est_size);
+    let file = fs::File::create(tags_path)?;
+    let mut writer = BufWriter::new(file);
 
-    article_html.push_str(
-        &HEADER
-            .replace("{{TITLE}}", "Tags")
-            .replace("{{DESCRIPTION}}", "Page for tags and tagged articles")
-            .replace("{{TAGS}}", "blog, blogpost, tags")
-            .replace("{{URL}}", "tags.html"),
-    );
+    let header_str = HEADER
+        .replace("{{TITLE}}", "Tags")
+        .replace("{{DESCRIPTION}}", "Page for tags and tagged articles")
+        .replace("{{TAGS}}", "blog, blogpost, tags")
+        .replace("{{URL}}", "tags.html");
+    writer.write_all(header_str.as_bytes())?;
 
     for tag in tags {
         let labels = &tags_map[tag];
-        writeln!(article_html, "<h1 id=\"{tag}\"><em>{tag}</em></h1>")?;
+        writer.write_all(format!("<h1 id=\"{tag}\"><em>{tag}</em></h1>\n").as_bytes())?;
 
-        article_html.push_str("<ul>\n");
+        writer.write_all(b"<ul>\n")?;
         for label in labels {
-            writeln!(article_html, "<li>{}</li>", label)?;
+            writer.write_all(format!("<li>{}</li>\n", label).as_bytes())?;
         }
-        article_html.push_str("</ul>\n<br><hr>\n");
+        writer.write_all(b"</ul>\n<br><hr>\n")?;
     }
 
-    article_html.push_str(FOOTER);
-    fs::write(tags_path, article_html)?;
+    writer.write_all(FOOTER.as_bytes())?;
+    writer.flush()?;
 
     Ok(())
 }

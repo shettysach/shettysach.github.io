@@ -105,4 +105,3 @@ pub(crate) fn generate_atom_feed(entries: Vec<Atom>, path: &Path) -> Result<()> 
 
     Ok(())
 }
-

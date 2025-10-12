@@ -57,9 +57,11 @@ impl<'a> Syntex<'a> for Parser<'a> {
             match event {
                 Event::Text(t) if capture => {
                     captive_string.push_str(&t);
-                    if captive_heading.is_some() {
-                        captive_events.push(Event::Text(t));
-                    }
+                }
+
+                Event::Text(t) if captive_heading.is_some() => {
+                    captive_string.push_str(&t);
+                    captive_events.push(Event::Text(t));
                 }
 
                 Event::Start(Tag::Heading {
@@ -69,14 +71,12 @@ impl<'a> Syntex<'a> for Parser<'a> {
                     attrs,
                 }) if toc.is_some() => {
                     captive_heading = Some((level, id, classes, attrs));
-                    capture = true;
                 }
 
                 Event::End(TagEnd::Heading(_)) => {
                     if let Some(table) = toc.as_mut() {
                         let (level, id, classes, attrs) =
                             unsafe { captive_heading.take().unwrap_unchecked() };
-                        capture = false;
 
                         let header_text = take(&mut captive_string);
                         let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&header_text)));
