@@ -7,7 +7,9 @@ subtitle: Welcome to my blog
 
 ---
 
-Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers and programming language compilers. I am also interested in learning about information theory, deep learning and functional programming. I currently use Rust, Python, C++ and C.
+Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers and programming language compilers. I am also interested in learning about information theory, deep learning and functional programming. I currently use Rust, Python, C++ and C. 
+You can visit my [GitHub](https://www.github.com/shettysach) and contact me via email - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com).
+
 
 Here are some of my personal projects. For more detail, read this [article](./02_projects/projects.html).
 
@@ -20,14 +22,4 @@ Here are some of my personal projects. For more detail, read this [article](./02
 - [Cohle](https://www.github.com/shettysach/cohle) - Rust CLI that prints Rust Cohle quotes
 - [Liquid-Oxygen](https://www.github.com/shettysach/Liquid-Oxygen) - Tree-walk interpreter for Lox written in Haskell
 
-You can visit my [GitHub](https://www.github.com/shettysach) and [LinkedIn](https://www.linkedin.com/in/sachithshetty314/) and contact me via email - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com)
-
-# Articles
-
----
-
-This blog is built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and
-[syntect](https://crates.io/crates/syntect). 
-It uses static HTML and CSS, generated from Markdown. 
-I aim to add more features to this blog and then articles and devlogs.
-
+This site is built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [syntect](https://crates.io/crates/syntect). It uses static HTML and CSS, generated from Markdown.

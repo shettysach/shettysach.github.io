@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://shettysach.github.io/sitemap.xml

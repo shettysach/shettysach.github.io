@@ -1,6 +1,8 @@
 mod atom;
 mod generate;
+mod sitemap;
 mod syntex;
+mod types;
 mod utils;
 
 use anyhow::Result;
@@ -15,7 +17,7 @@ fn main() -> Result<()> {
         fs::create_dir(output_dir)?;
     }
 
-    generate::index_page(input_dir, output_dir)?;
+    generate::ssgenerate(input_dir, output_dir)?;
     utils::copy_directory(others_dir, output_dir)?;
     // utils::generate_code_css(styles_dir)?;
 

@@ -23,7 +23,7 @@ You can find the Markdown source of the pages by querying githubusercontent.com.
 For eg - The source of `https://shettysach.github.io/index.html`, can be found at `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/index.md`
 
 ### Steps
-- Stem the link `https://shettysach.github.io`.
+- Stem the link, removing `https://shettysach.github.io/`.
 ```
 https://shettysach.github.io/index.html -> index.html 
 ```

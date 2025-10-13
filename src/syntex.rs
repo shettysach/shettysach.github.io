@@ -1,4 +1,6 @@
+use crate::types::{Article, Frontmatter};
 use crate::utils::Slugger;
+
 use anyhow::{Error, Result};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
@@ -17,19 +19,6 @@ pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_HEADING_ATTRIBUTES);
 
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
-
-pub(crate) struct Article<'a> {
-    pub(crate) frontmatter: Frontmatter,
-    pub(crate) events: Vec<Event<'a>>,
-    pub(crate) toc: Option<String>,
-}
-
-#[derive(Clone)]
-pub(crate) struct Frontmatter {
-    pub(crate) title: String,
-    pub(crate) subtitle: Option<String>,
-    pub(crate) tags: Option<Vec<String>>,
-}
 
 pub(crate) trait Custom<'a> {
     fn process(self) -> Result<Article<'a>>;

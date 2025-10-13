@@ -1,6 +1,8 @@
 use crate::{
-    atom::{Atom, generate_atom_feed},
-    syntex::{Article, Custom, Frontmatter, OPTIONS, extract_metadata},
+    atom::generate_atom_feed,
+    sitemap::generate_sitemap,
+    syntex::{Custom, OPTIONS, extract_metadata},
+    types::{Article, Entries, Frontmatter},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -51,27 +53,14 @@ fn render_markdown(
     Ok(frontmatter)
 }
 
-pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
-    let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
-    let Article {
-        frontmatter: metadata,
-        events,
-        ..
-    } = Parser::new_ext(&index_md, OPTIONS).process()?;
-
-    let file = fs::File::create(html_dir.join("index.html"))?;
-    let mut writer = BufWriter::new(file);
-
-    writer.write_all(metadata.header("").as_bytes())?;
-    write_html_io(&mut writer, events.into_iter())?;
-    writer.write_all(b"<ul>\n")?;
-
-    // TODO: Estimate no. of tags
-    let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(10);
-
-    // NOTE: Estimate, cases - same dir 2mds
+type C = (Vec<String>, Vec<Entries>, HashMap<String, Vec<Rc<String>>>);
+pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
     let est_count = WalkDir::new(markdown_dir).max_depth(1).into_iter().count() - 4;
-    let mut atom_entries = Vec::with_capacity(est_count);
+
+    let mut labels = Vec::with_capacity(est_count);
+    let mut entries = Vec::with_capacity(est_count);
+
+    let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(6);
 
     for entry in WalkDir::new(markdown_dir)
         .max_depth(2)
@@ -110,9 +99,9 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
                 }
             }
 
-            writer.write_all(format!("<li>{}</li>\n", label).as_bytes())?;
+            labels.push(format!("<li>{}</li>\n", label));
 
-            atom_entries.push(Atom {
+            entries.push(Entries {
                 title: frontmatter.title,
                 subtitle: frontmatter.subtitle,
                 datetime: DateTime::<Utc>::from(modified),
@@ -127,18 +116,59 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
         }
     }
 
-    writer.write_all(b"</ul>\n")?;
+    Ok((labels, entries, tags_map))
+}
+
+pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
+    let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
+    let Article {
+        frontmatter: metadata,
+        events,
+        ..
+    } = Parser::new_ext(&index_md, OPTIONS).process()?;
+
+    let file = fs::File::create(html_dir.join("index.html"))?;
+    let mut writer = BufWriter::new(file);
+
+    writer.write_all(metadata.header("").as_bytes())?;
+    write_html_io(&mut writer, events.into_iter())?;
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    tags_page(tags_map, &html_dir.join("tags.html"))?;
-
-    generate_atom_feed(atom_entries, &html_dir.join("atom.xml"))?;
+    let (labels, atom_entries, tags_map) = collect_articles(markdown_dir, html_dir)?;
+    generate_articles_page(html_dir, labels)?;
+    generate_tags_page(tags_map, &html_dir.join("tags.html"))?;
+    generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
+    generate_sitemap(&atom_entries, &html_dir.join("sitemap.xml"))?;
 
     Ok(())
 }
 
-fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Result<()> {
+pub(crate) fn generate_articles_page(html_dir: &Path, labels: Vec<String>) -> Result<()> {
+    let file = fs::File::create(html_dir.join("articles.html"))?;
+    let mut writer = BufWriter::new(file);
+
+    let header_str = HEADER
+        .replace("{{TITLE}}", "Articles")
+        .replace("{{DESCRIPTION}}", "List of all articles")
+        .replace("{{TAGS}}", "blog, blogpost, articles")
+        .replace("{{URL}}", "articles.html");
+
+    writer.write_all(header_str.as_bytes())?;
+    writer.write_all("<h1>Articles</h1><hr>".as_bytes())?;
+
+    writer.write_all(b"<ul>\n")?;
+    for label in labels {
+        writer.write_all(label.as_bytes())?;
+    }
+    writer.write_all(b"</ul>\n")?;
+    writer.write_all(FOOTER.as_bytes())?;
+    writer.flush()?;
+
+    Ok(())
+}
+
+fn generate_tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Result<()> {
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
@@ -151,16 +181,19 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
         .replace("{{TAGS}}", "blog, blogpost, tags")
         .replace("{{URL}}", "tags.html");
     writer.write_all(header_str.as_bytes())?;
+    writer.write_all("<h1>Tags</h1><hr>".as_bytes())?;
 
     for tag in tags {
         let labels = &tags_map[tag];
-        writer.write_all(format!("<h1 id=\"{tag}\"><em>{tag}</em></h1>\n").as_bytes())?;
+        writer.write_all(
+            format!("<br><details><summary id=\"{tag}\"><em>{tag}</em></summary>\n").as_bytes(),
+        )?;
 
         writer.write_all(b"<ul>\n")?;
         for label in labels {
             writer.write_all(format!("<li>{}</li>\n", label).as_bytes())?;
         }
-        writer.write_all(b"</ul>\n<br><hr>\n")?;
+        writer.write_all(b"</ul>\n</details>\n")?;
     }
 
     writer.write_all(FOOTER.as_bytes())?;

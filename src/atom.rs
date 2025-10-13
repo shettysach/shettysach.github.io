@@ -1,18 +1,11 @@
+use crate::types::Entries;
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::writer::Writer;
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Path};
 
-pub(crate) struct Atom {
-    pub(crate) title: String,
-    pub(crate) subtitle: Option<String>,
-    pub(crate) datetime: DateTime<Utc>,
-    pub(crate) url: String,
-}
-
-pub(crate) fn generate_atom_feed(entries: Vec<Atom>, path: &Path) -> Result<()> {
+pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
     writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
@@ -58,10 +51,10 @@ pub(crate) fn generate_atom_feed(entries: Vec<Atom>, path: &Path) -> Result<()> 
     writer.write_event(Event::End(BytesEnd::new("updated")))?;
 
     // entries
-    for Atom {
+    for Entries {
         title,
         subtitle,
-        datetime: date,
+        datetime,
         url,
     } in entries
     {
@@ -69,7 +62,7 @@ pub(crate) fn generate_atom_feed(entries: Vec<Atom>, path: &Path) -> Result<()> 
 
         // title
         writer.write_event(Event::Start(BytesStart::new("title")))?;
-        writer.write_event(Event::Text(BytesText::new(&title)))?;
+        writer.write_event(Event::Text(BytesText::new(title)))?;
         writer.write_event(Event::End(BytesEnd::new("title")))?;
 
         // id - use url
@@ -80,7 +73,7 @@ pub(crate) fn generate_atom_feed(entries: Vec<Atom>, path: &Path) -> Result<()> 
 
         // updated
         writer.write_event(Event::Start(BytesStart::new("updated")))?;
-        writer.write_event(Event::Text(BytesText::new(&date.to_rfc3339())))?;
+        writer.write_event(Event::Text(BytesText::new(&datetime.to_rfc3339())))?;
         writer.write_event(Event::End(BytesEnd::new("updated")))?;
 
         // link
