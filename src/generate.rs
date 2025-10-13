@@ -1,10 +1,10 @@
 use crate::{
-    atom::{generate_atom_feed, Atom},
-    syntex::{extract_metadata, Article, Metadata, Syntex, OPTIONS},
+    atom::{Atom, generate_atom_feed},
+    syntex::{Article, Custom, Frontmatter, OPTIONS, extract_metadata},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{html::write_html_io, Parser};
+use pulldown_cmark::{Parser, html::write_html_io};
 use std::io::{BufWriter, Write};
 use std::{collections::HashMap, fs, path::Path, rc::Rc, time::SystemTime};
 use walkdir::WalkDir;
@@ -17,7 +17,7 @@ fn render_markdown(
     dst: &Path,
     modified: SystemTime,
     rel_url: &str,
-) -> Result<Metadata> {
+) -> Result<Frontmatter> {
     let markdown = fs::read_to_string(src)?;
 
     if dst.exists() && dst.metadata()?.modified()? > modified {
@@ -27,14 +27,14 @@ fn render_markdown(
 
     let Article {
         events,
-        metadata,
+        frontmatter,
         toc,
     } = Parser::new_ext(&markdown, OPTIONS).process()?;
 
     let file = fs::File::create(dst)?;
     let mut writer = BufWriter::new(file);
 
-    writer.write_all(metadata.header(rel_url).as_bytes())?;
+    writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
     if let Some(table) = toc {
         let table = Parser::new(&table);
@@ -48,13 +48,15 @@ fn render_markdown(
 
     writer.flush()?;
 
-    Ok(metadata)
+    Ok(frontmatter)
 }
 
 pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
     let Article {
-        metadata, events, ..
+        frontmatter: metadata,
+        events,
+        ..
     } = Parser::new_ext(&index_md, OPTIONS).process()?;
 
     let file = fs::File::create(html_dir.join("index.html"))?;
@@ -88,12 +90,12 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             let rel_html = rel_path.with_extension("html");
             let rel_url = rel_html.to_str().with_context(|| "Path not UTF8")?;
 
-            let metadata = render_markdown(src_path, &dst_html, modified, rel_url)?;
-            let label_rc = Rc::new(metadata.label(rel_url));
+            let frontmatter = render_markdown(src_path, &dst_html, modified, rel_url)?;
+            let label_rc = Rc::new(frontmatter.label(rel_url));
 
             let mut label = (*label_rc).clone();
 
-            if let Some(tags) = metadata.tags {
+            if let Some(tags) = frontmatter.tags {
                 label.push_str("<br>");
                 label.push_str(
                     &tags
@@ -111,8 +113,8 @@ pub(crate) fn index_page(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
             writer.write_all(format!("<li>{}</li>\n", label).as_bytes())?;
 
             atom_entries.push(Atom {
-                title: metadata.title,
-                subtitle: metadata.subtitle,
+                title: frontmatter.title,
+                subtitle: frontmatter.subtitle,
                 datetime: DateTime::<Utc>::from(modified),
                 url: rel_url.to_string(),
             });
@@ -167,7 +169,7 @@ fn tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Re
     Ok(())
 }
 
-impl Metadata {
+impl Frontmatter {
     fn header(&self, url: &str) -> String {
         let description = self.subtitle.as_deref().unwrap_or("Blogpost");
         let tags = &self

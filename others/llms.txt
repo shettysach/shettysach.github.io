@@ -1,6 +1,6 @@
-# Sachith Shetty's Blog
+# Sachith Shetty
 
-This is a personal blog where I write about programming, technology, and other topics I'm interested in.
+> This is a personal blog where I write about programming, technology, and other topics I'm interested in.
 
 ## Content
 
@@ -14,4 +14,32 @@ The blog contains articles on various technical topics including:
 
 - Home: index.html
 - Tags: tags.html
-- These 2 pages consist of links to other posts
+- Sitemap: sitemap.xml
+- Atom feed: atom.xml
+
+## Markdown
+
+You can find the Markdown source of the pages by querying githubusercontent.com. 
+For eg - The source of `https://shettysach.github.io/index.html`, can be found at `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/index.md`
+
+### Steps
+- Stem the link `https://shettysach.github.io`.
+```
+https://shettysach.github.io/index.html -> index.html 
+```
+
+- Remove the `.html` extension, and add `.md` 
+```
+index.html -> index.md 
+```
+
+- Append to `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/` and request
+```
+index.md -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/index.md 
+```
+
+The same applies to pages within subdirectories, eg -
+
+```
+ https://shettysach.github.io/02_projects/projects.html -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/02_projects/projects.md 
+```

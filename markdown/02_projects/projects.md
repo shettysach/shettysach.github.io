@@ -1,11 +1,7 @@
 ---
 title: Projects
 subtitle: A post to display my personal projects
-tags:
-  - Rust
-  - Python
-  - Odin
-  - Haskell
+tags: [ Rust, Python, Odin, Haskell ]
 ---
 
 # Projects
@@ -24,7 +20,7 @@ These are some of my personal projects.
 - Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
 - Extend Lox with first-class lists and native functions for native functions for list operations
 
-### Languages:
+### Languages
 
 - Odin
 
@@ -46,7 +42,7 @@ These are some of my personal projects.
 - Capable of MNIST classification with an example implemented using the library
 - Capable of creating neurons, dense layers, and multilayer perceptrons (MLPs) for binary and multiclass/multilabel non-linear classification
 
-### Features:
+### Features
 
 - Optimizers:
   Adam, RMSprop, SGD with momentum
@@ -55,7 +51,7 @@ These are some of my personal projects.
 - Activation functions:
   ReLU, LeakyReLU, sigmoid, tanh
 
-### Languages:
+### Languages
 
 - Rust
 
@@ -75,18 +71,18 @@ These are some of my personal projects.
 - The individual digits/operators are detected and their most probable target classes are predicted
 - The predictions are combined into a string and evaluated to get the result
 
-### Languages:
+### Languages
 
 - Python
 
-### Modules:
+### Modules
 
 - pytorch, torchvision
 - opencv
 - numpy, pandas
 - customtkinter
 
-### Tools:
+### Tools
 
 - conda, jupyter
 
@@ -110,12 +106,12 @@ These are some of my personal projects.
 - Built with Hugging Face's Candle framework, which includes the `candle_transformers` crate for LLM inferencing
 - Employs Tokio and Actix for asynchronous functionality in the backend, alongside Leptos and TailwindCSS for the frontend
 
-### Languages:
+### Languages
 
 - Rust
 - TailwindCSS
 
-### Crates and frameworks:
+### Crates and frameworks
 
 - candle-core, candle-transformers
 - tokio, actix
@@ -139,7 +135,7 @@ __   _____  /\ \ \_   _ _ __ ___
 - Stands for vectorized N-dimensional numerical arrays
 - Tensor/ ndarray library
 
-### Features:
+### Features
 
 - Broadcasted algebraic operations
 - nd matrix multiplication (naive)
@@ -147,7 +143,7 @@ __   _____  /\ \ \_   _ _ __ ___
 - Reduce operations such as sum, product, max, min and pooling
 - Transformations such as view/reshape, permute/transpose, flip, expand, pad, slice, squeeze, unsqueeze
 
-### Languages:
+### Languages
 
 - Rust
 
@@ -163,12 +159,12 @@ __   _____  /\ \ \_   _ _ __ ___
 - Terminal style portfolio website, built using the Leptos framework for Rust WASM
 - Customizable and configurable using JSON
 
-### Languages:
+### Languages
 
 - Rust
 - HTML, CSS
 
-### Crates:
+### Crates
 
 - leptos, leptos-use
 - tokio, reqwest
@@ -183,7 +179,7 @@ __   _____  /\ \ \_   _ _ __ ___
 
 - Rust CLI that prints Rust Cohle quotes
 
-### Languages:
+### Languages
 
 - Haskell
 
@@ -202,6 +198,6 @@ _    _ ____ _  _ _ ___     ____ _  _ _   _ ____ ____ _  _
 
 - Tree-walk interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html), based on the first half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
 
-### Languages:
+### Languages
 
 - Haskell

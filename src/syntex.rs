@@ -19,23 +19,23 @@ pub(crate) const OPTIONS: Options = Options::empty()
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 
 pub(crate) struct Article<'a> {
-    pub(crate) metadata: Metadata,
+    pub(crate) frontmatter: Frontmatter,
     pub(crate) events: Vec<Event<'a>>,
     pub(crate) toc: Option<String>,
 }
 
 #[derive(Clone)]
-pub(crate) struct Metadata {
+pub(crate) struct Frontmatter {
     pub(crate) title: String,
     pub(crate) subtitle: Option<String>,
     pub(crate) tags: Option<Vec<String>>,
 }
 
-pub(crate) trait Syntex<'a> {
+pub(crate) trait Custom<'a> {
     fn process(self) -> Result<Article<'a>>;
 }
 
-impl<'a> Syntex<'a> for Parser<'a> {
+impl<'a> Custom<'a> for Parser<'a> {
     fn process(self: Parser<'a>) -> Result<Article<'a>> {
         let mut syntax_token: Option<CowStr> = None;
         let mut storage = Storage::new();
@@ -162,7 +162,7 @@ impl<'a> Syntex<'a> for Parser<'a> {
 
         metadata_init
             .map(|metadata| Article {
-                metadata,
+                frontmatter: metadata,
                 events,
                 toc,
             })
@@ -204,7 +204,7 @@ fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
     Ok(format!("<pre><code>{}</code></pre>", class_gen.finalize()))
 }
 
-fn parse_metadata(docs: Vec<Yaml>) -> Option<(Metadata, bool)> {
+fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, bool)> {
     let doc = docs.first()?;
     let title = doc["title"].as_str()?.to_string();
     let subtitle = doc["subtitle"].as_str().map(str::to_string);
@@ -214,7 +214,7 @@ fn parse_metadata(docs: Vec<Yaml>) -> Option<(Metadata, bool)> {
     let create_toc = doc["toc"].as_bool().is_some_and(|t| t);
 
     Some((
-        Metadata {
+        Frontmatter {
             title,
             subtitle,
             tags,
@@ -223,7 +223,7 @@ fn parse_metadata(docs: Vec<Yaml>) -> Option<(Metadata, bool)> {
     ))
 }
 
-pub(crate) fn extract_metadata(markdown: &str) -> Option<Metadata> {
+pub(crate) fn extract_metadata(markdown: &str) -> Option<Frontmatter> {
     let start = markdown.find("---\n")?;
     let rest = &markdown[start + 4..];
     let end = rest.find("\n---\n")?;
