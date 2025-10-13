@@ -34,8 +34,8 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
 // code.css
 
 #[allow(dead_code)]
-pub(crate) fn generate_code_css(styles_dir: &Path) -> Result<()> {
-    let code_css_path = styles_dir.join("syntax.css");
+pub(crate) fn generate_code_css(extras_dir: &Path) -> Result<()> {
+    let code_css_path = extras_dir.join("syntax.css");
 
     if !code_css_path.exists() {
         let file = fs::File::open("./Enki-Tokyo-Night.tmTheme")?;

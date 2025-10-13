@@ -1,10 +1,10 @@
 use crate::{
-    atom::{Atom, generate_atom_feed},
-    syntex::{Article, Metadata, OPTIONS, Syntex, extract_metadata},
+    atom::{generate_atom_feed, Atom},
+    syntex::{extract_metadata, Article, Metadata, Syntex, OPTIONS},
 };
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{Parser, html::write_html_io};
+use pulldown_cmark::{html::write_html_io, Parser};
 use std::io::{BufWriter, Write};
 use std::{collections::HashMap, fs, path::Path, rc::Rc, time::SystemTime};
 use walkdir::WalkDir;
