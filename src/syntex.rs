@@ -1,6 +1,7 @@
-use crate::types::{Article, Frontmatter};
-use crate::utils::Slugger;
-
+use crate::{
+    types::{Article, CaptiveHeading, Frontmatter},
+    utils::Slugger,
+};
 use anyhow::{Error, Result};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
@@ -32,8 +33,7 @@ impl<'a> Custom<'a> for Parser<'a> {
         let mut toc: Option<String> = None;
 
         let mut captive_string: Option<String> = None;
-        let mut captive_heading = None;
-        let mut captive_events: Vec<Event<'a>> = Vec::new();
+        let mut captive_heading: Option<CaptiveHeading<'a>> = None;
 
         let mut metadata_init = None;
 
@@ -44,11 +44,10 @@ impl<'a> Custom<'a> for Parser<'a> {
         for event in self {
             match event {
                 Event::Text(t) => {
-                    if let Some(s) = captive_string.as_mut() {
+                    if let Some(ch) = captive_heading.as_mut() {
+                        ch.events.push(Event::Text(t));
+                    } else if let Some(s) = captive_string.as_mut() {
                         s.push_str(&t);
-                        if captive_heading.is_some() {
-                            captive_events.push(Event::Text(t));
-                        }
                     } else {
                         events.push(Event::Text(t));
                     }
@@ -60,16 +59,36 @@ impl<'a> Custom<'a> for Parser<'a> {
                     classes,
                     attrs,
                 }) if toc.is_some() => {
-                    captive_heading = Some((level, id, classes, attrs));
-                    captive_string = Some(String::new());
+                    captive_heading = Some(CaptiveHeading {
+                        level,
+                        id,
+                        classes,
+                        attrs,
+                        events: Vec::with_capacity(1),
+                    });
                 }
 
                 Event::End(TagEnd::Heading(_)) => {
                     if let Some(table) = toc.as_mut() {
-                        let (level, id, classes, attrs) =
-                            unsafe { captive_heading.take().unwrap_unchecked() };
+                        let CaptiveHeading {
+                            level,
+                            id,
+                            classes,
+                            attrs,
+                            events: mut h_events,
+                        } = captive_heading.take().unwrap();
 
-                        if let Some(header_text) = captive_string.take() {
+                        let header_text = h_events
+                            .iter()
+                            .filter_map(|event| match event {
+                                Event::Text(s) | Event::Code(s) | Event::InlineMath(s) => {
+                                    Some(s.as_ref())
+                                }
+                                _ => None,
+                            })
+                            .collect::<String>();
+
+                        if !header_text.is_empty() {
                             let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&header_text)));
                             table.push_str(&table_bullet(level, &header_text, &id));
 
@@ -80,8 +99,7 @@ impl<'a> Custom<'a> for Parser<'a> {
                                 attrs,
                             }));
 
-                            events.append(&mut captive_events);
-                            captive_events.clear();
+                            events.append(&mut h_events);
                         }
                     }
 
@@ -89,10 +107,9 @@ impl<'a> Custom<'a> for Parser<'a> {
                 }
 
                 Event::Code(code) if captive_heading.is_some() => {
-                    if let Some(s) = captive_string.as_mut() {
-                        s.push_str(&code);
+                    if let Some(h) = captive_heading.as_mut() {
+                        h.events.push(Event::Code(code));
                     }
-                    captive_events.push(Event::Code(code));
                 }
 
                 Event::Start(Tag::CodeBlock(kind)) => {
@@ -117,16 +134,12 @@ impl<'a> Custom<'a> for Parser<'a> {
                     events.push(event);
                 }
 
-                Event::InlineMath(latex) => {
-                    let mathml = latex_to_mathml(&latex, &mut storage, DisplayMode::Inline)?;
-                    let event = Event::InlineHtml(CowStr::from(mathml));
-
-                    if captive_heading.is_some() {
-                        if let Some(s) = captive_string.as_mut() {
-                            s.push_str(&latex);
-                        }
-                        captive_events.push(event);
+                Event::InlineMath(ref latex) => {
+                    if let Some(h) = captive_heading.as_mut() {
+                        h.events.push(event);
                     } else {
+                        let mathml = latex_to_mathml(latex, &mut storage, DisplayMode::Inline)?;
+                        let event = Event::InlineHtml(CowStr::from(mathml));
                         events.push(event);
                     }
                 }

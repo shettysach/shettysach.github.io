@@ -5,13 +5,15 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
+
 pulldown-cmark = "0.13.0" 
 pulldown-latex = "0.7.1"
-rustc-hash = "2.1.1"
-
 syntect = "5.3.0"
-walkdir = "2.5.0"
+
+rustc-hash = "2.1.1"
 xxhash-rust = { version = "0.8.15", features = ["xxh32"] }
+
+walkdir = "2.5.0"
 yaml-rust2 = "0.10.3"
 chrono = { version = "0.4", features = ["serde"] }
 quick-xml = "0.31"

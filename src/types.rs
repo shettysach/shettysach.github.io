@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use pulldown_cmark::Event;
+use pulldown_cmark::{CowStr, Event, HeadingLevel};
 
 pub(crate) struct Frontmatter {
     pub(crate) title: String,
@@ -20,3 +20,10 @@ pub(crate) struct Entries {
     pub(crate) url: String,
 }
 
+pub(crate) struct CaptiveHeading<'a> {
+    pub(crate) level: HeadingLevel,
+    pub(crate) id: Option<CowStr<'a>>,
+    pub(crate) classes: Vec<CowStr<'a>>,
+    pub(crate) attrs: Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
+    pub(crate) events: Vec<Event<'a>>,
+}

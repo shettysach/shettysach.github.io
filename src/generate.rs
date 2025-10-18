@@ -46,6 +46,7 @@ fn render_markdown(
     }
 
     write_html_io(&mut writer, events.into_iter())?;
+
     writer.write_all(FOOTER.as_bytes())?;
 
     writer.flush()?;

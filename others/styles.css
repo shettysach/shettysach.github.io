@@ -1,33 +1,34 @@
 @import "./syntax.css";
 
 :root {
-  --terminal-red: #f7768e;
-  --number-boolean-constants: #ff9e64;
-  --function-parameters: #e0af68;
-  --parameters-inside-functions: #cfc9c2;
-  --strings-css-class-names: #9ece6a;
-  --object-literal-keys: #73daca;
-  --regex-literal-strings: #b4f9f8;
-  --language-support-functions: #2ac3de;
-  --object-properties: #7dcfff;
-  --function-names: #7aa2f7;
-  --control-keywords: #bb9af7;
-  --variables-class-names: #c0caf5;
-  --editor-foreground: #a9b1d6;
-  --markdown-html-text: #9aa5ce;
-  --comments: #565f89;
-  --terminal-black: #414868;
-  --editor-background-night: #1a1b26;
+  /* Base palette */
+  --color-red-500: #f7768e;          
+  --color-orange-400: #ff9e64;       
+  --color-amber-400: #e0af68;        
+  --color-stone-200: #cfc9c2;         
+  --color-green-400: #9ece6a;        
+  --color-teal-300: #73daca;         
+  --color-cyan-200: #b4f9f8;         
+  --color-sky-300: #2ac3de;
+  --color-sky-400: #7dcfff;          
+  --color-indigo-400: #7aa2f7;       
+  --color-violet-400: #bb9af7;       
+  --color-slate-200: #c0caf5;        
+  --color-slate-300: #a9b1d6;        
+  --color-slate-400: #9aa5ce;        
+  --color-slate-600: #565f89;        
+  --color-slate-800: #414868;        
+  --color-night-900: #1a1b26;        
 
-  /* --storm-bg: #24283b; */
-  --storm-bg: rgba(36, 40, 59, 0.5);
+  /* Surfaces */
+  --bg-surface-blur: rgba(36, 40, 59, 0.5); 
 }
 
 body {
   font-family: "Lora", serif;
   margin: 0;
   padding: 0;
-  background-color: var(--editor-background-night);
+  background-color: var(--color-night-900);
   background-image:
     linear-gradient(rgba(26, 27, 38, 0.8), rgba(26, 27, 38, 0.85)),
     url("./background.avif");
@@ -35,7 +36,7 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  color: var(--variables-class-names);
+  color: var(--color-slate-200);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -49,9 +50,9 @@ main {
 }
 
 header {
-  background: var(--storm-bg); 
+  background: var(--bg-surface-blur);
   position: fixed;
-  color: var(--variables-class-names);
+  color: var(--color-slate-200);
   padding: 1rem 20%;
   position: sticky;
   z-index: 1000;
@@ -62,12 +63,12 @@ header nav {
 }
 
 details {
-  background: var(--storm-bg); 
+  background: var(--bg-surface-blur);
   padding: 0.5rem;
 }
 
 summary {
-  color: var(--object-properties);
+  color: var(--color-sky-400);
   cursor: pointer;
   list-style-type: none;
 }
@@ -79,8 +80,8 @@ summary::marker {
 details[open] > summary::marker { content: "-\00A0"; }
 
 footer {
-  background: var(--storm-bg); 
-  color: var(--variables-class-names);
+  background: var(--bg-surface-blur);
+  color: var(--color-slate-200);
   text-align: center;
   padding: 1rem;
 }
@@ -89,13 +90,13 @@ section { margin-bottom: 2rem; }
 
 h1, h2, h3, h4, h5, h6 {
   font-weight: normal;
-  color: var(--object-properties);
+  color: var(--color-sky-400);
   margin-bottom: 1rem;
 }
 
 pre {
   font-family: "JetBrains Mono", monospace;
-  background: var(--storm-bg);
+  background: var(--bg-surface-blur);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
@@ -129,8 +130,8 @@ math[display="block"] {
 }
 
 blockquote {
-  border-left: 5px solid var(--control-keywords);
-  background: var(--storm-bg);
+  border-left: 5px solid var(--color-violet-400);
+  background: var(--bg-surface-blur);
   margin: 1rem 0;
   padding-left: 1rem;
 }
@@ -157,7 +158,7 @@ li {
 
 a,
 a * {
-  color: var(--function-names);
+  color: var(--color-indigo-400);
   text-decoration: none;
 }
 
@@ -170,8 +171,8 @@ img {
 }
 
 hr {
-  color: var(--function-names);
-  border-color: var(--function-names);
+  color: var(--color-indigo-400);
+  border-color: var(--color-indigo-400);
 }
 
 header nav {
@@ -192,7 +193,7 @@ header nav ul li {
 }
 
 .ascii {
-  color: var(--object-literal-keys);
+  color: var(--color-teal-300);
 }
 
 @media (max-width: 768px) {
@@ -200,7 +201,6 @@ header nav ul li {
   footer,
   main {
     padding: 1rem 1rem;
-    font-size: 1rem;
     overflow-wrap: anywhere;
     word-break: break-word; /* fallback/help for some engines */
     hyphens: auto;          /* optional, nicer breaks for prose */
