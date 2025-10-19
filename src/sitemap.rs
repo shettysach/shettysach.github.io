@@ -1,5 +1,6 @@
 use crate::types::Entries;
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::writer::Writer;
 use std::{fs, path::Path};
@@ -13,12 +14,22 @@ pub(crate) fn generate_sitemap(entries: &[Entries], path: &Path) -> Result<()> {
     urlset_start.push_attribute(("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9"));
     writer.write_event(Event::Start(urlset_start))?;
 
+    let metadata = fs::metadata("markdown/index.md")?;
+    let mtime = metadata.modified()?;
+    let idate = DateTime::<Utc>::from(mtime);
+
+    let ldate = entries
+        .iter()
+        .map(|e| e.datetime)
+        .max()
+        .unwrap_or(Utc::now());
+
     let static_pages = [
-        ("index.html", "1.0"),
-        ("articles.html", "0.9"),
-        ("tags.html", "0.8"),
+        ("index.html", "1.0", idate),
+        ("articles.html", "0.9", ldate),
+        ("tags.html", "0.8", ldate),
     ];
-    for (page, pri) in static_pages {
+    for (page, pri, lastmod) in static_pages {
         writer.write_event(Event::Start(BytesStart::new("url")))?;
 
         // loc
@@ -29,7 +40,9 @@ pub(crate) fn generate_sitemap(entries: &[Entries], path: &Path) -> Result<()> {
 
         // lastmod
         writer.write_event(Event::Start(BytesStart::new("lastmod")))?;
-        writer.write_event(Event::Text(BytesText::new("2025-10-13T00:00:00Z")))?;
+        writer.write_event(Event::Text(BytesText::new(
+            &lastmod.format("%Y-%m-%d").to_string(),
+        )))?;
         writer.write_event(Event::End(BytesEnd::new("lastmod")))?;
 
         // priority
@@ -51,7 +64,9 @@ pub(crate) fn generate_sitemap(entries: &[Entries], path: &Path) -> Result<()> {
 
         // lastmod
         writer.write_event(Event::Start(BytesStart::new("lastmod")))?;
-        writer.write_event(Event::Text(BytesText::new(&datetime.to_rfc3339())))?;
+        writer.write_event(Event::Text(BytesText::new(
+            &datetime.format("%Y-%m-%d").to_string(),
+        )))?;
         writer.write_event(Event::End(BytesEnd::new("lastmod")))?;
 
         // priority
