@@ -1,22 +1,16 @@
 use crate::types::Frontmatter;
 use anyhow::Result;
+use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
 use pulldown_cmark::{
-    CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
+    CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Parser, Tag, TagEnd,
 };
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
-use std::sync::OnceLock;
-use syntect::{
-    html::{ClassStyle, ClassedHTMLGenerator},
-    parsing::SyntaxSet,
-};
 use yaml_rust2::{Yaml, YamlLoader};
 
-pub(crate) const OPTIONS: Options = Options::empty()
-    .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
-    .union(Options::ENABLE_MATH)
-    .union(Options::ENABLE_HEADING_ATTRIBUTES);
-
-static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
+pub(crate) const OPTIONS: pulldown_cmark::Options = pulldown_cmark::Options::empty()
+    .union(pulldown_cmark::Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
+    .union(pulldown_cmark::Options::ENABLE_MATH)
+    .union(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
 
 pub(crate) fn latex_to_mathml(
     latex: &str,
@@ -37,19 +31,22 @@ pub(crate) fn latex_to_mathml(
 }
 
 pub(crate) fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
-    let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
-    let syntax = syntax_token
-        .and_then(|t| syntax_set.find_syntax_by_token(t))
-        .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
+    let formatter = HtmlLinkedBuilder::new()
+        .source(code)
+        .lang(match syntax_token {
+            Some("rust") => Language::Rust,
+            Some("html") => Language::HTML,
+            Some("latex") => Language::LaTeX,
+            _ => Language::PlainText,
+        })
+        .pre_class(None)
+        .build()?;
 
-    let mut class_gen =
-        ClassedHTMLGenerator::new_with_class_style(syntax, syntax_set, ClassStyle::Spaced);
+    let mut output = Vec::new();
+    formatter.format(&mut output)?;
+    let html = String::from_utf8(output)?;
 
-    for line in code.split_inclusive('\n') {
-        class_gen.parse_html_for_line_which_includes_newline(line)?
-    }
-
-    Ok(format!("<pre><code>{}</code></pre>", class_gen.finalize()))
+    Ok(html)
 }
 
 pub(crate) fn process_metadata(mut parser: Parser) -> Option<(Frontmatter, bool)> {

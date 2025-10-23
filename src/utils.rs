@@ -1,10 +1,6 @@
 use anyhow::Result;
 use rustc_hash::{FxBuildHasher, FxHashMap};
-use std::{fs, io::BufReader, path::Path};
-use syntect::{
-    highlighting::ThemeSet,
-    html::{ClassStyle, css_for_theme_with_class_style},
-};
+use std::{fs, path::Path};
 use walkdir::WalkDir;
 use xxhash_rust::xxh32::xxh32;
 
@@ -26,23 +22,6 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
         // else if entry.file_type().is_dir() && !target.exists() {
         //     fs::create_dir_all(&target)?;
         // }
-    }
-
-    Ok(())
-}
-
-// code.css
-
-#[allow(dead_code)]
-pub(crate) fn generate_code_css(extras_dir: &Path) -> Result<()> {
-    let code_css_path = extras_dir.join("syntax.css");
-
-    if !code_css_path.exists() {
-        let file = fs::File::open("./Enki-Tokyo-Night.tmTheme")?;
-        let mut reader = BufReader::new(file);
-        let theme = &ThemeSet::load_from_reader(&mut reader)?;
-        let code_css = css_for_theme_with_class_style(theme, ClassStyle::Spaced)?;
-        fs::write(code_css_path, code_css)?;
     }
 
     Ok(())

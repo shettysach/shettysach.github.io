@@ -6,7 +6,7 @@ tags:
     - Blog
     - Rust
     - LaTeX
-toc: true
+<!-- toc: true -->
 ---
 
 # Rendering math and highlighting code
@@ -103,16 +103,15 @@ fn sum_of_cubes_rhs(n: usize) -> usize {
 }
 ```
 
-For syntax highlighting, the blog uses the [`syntect`](https://crates.io/crates/pulldown-cmark) crate,
-which is also used in various other programs such as [`bat`](https://github.com/sharkdp/bat), the alternative
-to `cat`.
+For syntax highlighting, the blog uses the [`autumnus`](https://crates.io/crates/autumnus) crate,
+which uses [`Tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood. 
+Tree-sitter powers the highlighting in editors such as 
+[Neovim](https://neovim.io/doc/user/treesitter.html) and [Zed](https://zed.dev/blog/syntax-aware-editing).
 
 When `pulldown-cmark` identifies a codeblock,
-`syntect` generates HTML with CSS classes for different code elements
+`autumnus` generates HTML with CSS classes for different code elements
 like keywords, variables and constants. This enables for syntax highlighting
 through CSS classes, which makes it easy to have colours assigned to different elements.
-
-`syntect` also generates CSS files from `.tmTheme` files. This blog uses [`Enki-Tokyo-Night`](https://raw.githubusercontent.com/enkia/enki-theme/refs/heads/master/scheme/Enki-Tokyo-Night.tmTheme) from the [Enki Theme by enkia](https://github.com/enkia/enki-theme).
 
 ```html
 <pre><code><span class="source rust"><span class="meta function rust"><span class="meta function rust"><span class="storage type function rust">fn</span> </span><span class="entity name function rust">sum_of_cubes_lhs</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">(</span><span class="variable parameter rust">n</span><span class="punctuation separator rust">:</span> <span class="storage type rust">usize</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters end rust">)</span></span></span></span><span class="meta function rust"> <span class="meta function return-type rust"><span class="punctuation separator rust">-&gt;</span> <span class="storage type rust">usize</span></span> </span><span class="meta function rust"><span class="meta block rust"><span class="punctuation section block begin rust">{</span>

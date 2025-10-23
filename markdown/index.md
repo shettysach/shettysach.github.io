@@ -9,7 +9,7 @@ subtitle: Welcome to my blog
 
 Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers and programming language compilers. I am also interested in learning about information theory, deep learning and functional programming. I currently use Rust, Python, C++ and C. 
 
-This is my personal website, built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [syntect](https://crates.io/crates/syntect). It uses static HTML and CSS, generated from Markdown.
+This is my personal website, built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [autumnus](https://crates.io/crates/autumnus). It uses static HTML and CSS, generated from Markdown.
 
 Here are some of my personal projects. For more detail, read this [article](./02_projects/projects.html).
 
