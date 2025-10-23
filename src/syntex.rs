@@ -1,8 +1,8 @@
 use crate::{
-    types::{Article, CaptiveHeading, Frontmatter},
+    types::{CaptiveHeading, EmittingHeading, Frontmatter, TableOfContents},
     utils::Slugger,
 };
-use anyhow::{Error, Result};
+use anyhow::Result;
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
 };
@@ -21,154 +21,175 @@ pub(crate) const OPTIONS: Options = Options::empty()
 
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 
-pub(crate) trait Custom<'a> {
-    fn process(self) -> Result<Article<'a>>;
+pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
+    inner: I,
+    syntax_token: Option<CowStr<'a>>,
+    storage: Storage,
+    captive_string: Option<String>,
+    toc: Option<TableOfContents<'a>>,
 }
 
-impl<'a> Custom<'a> for Parser<'a> {
-    fn process(self: Parser<'a>) -> Result<Article<'a>> {
-        let mut syntax_token: Option<CowStr> = None;
-        let mut storage = Storage::new();
+impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
+    pub(crate) fn new(inner: I, has_toc: bool) -> Self {
+        Self {
+            inner,
+            syntax_token: None,
+            storage: Storage::new(),
+            captive_string: None,
+            toc: has_toc.then_some(TableOfContents {
+                table: String::new(),
+                captive_heading: None,
+                emitting_heading: None,
+                slugger: Slugger::with_capacity(4),
+            }),
+        }
+    }
+}
 
-        let mut toc: Option<String> = None;
+impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
+    type Item = Event<'a>;
 
-        let mut captive_string: Option<String> = None;
-        let mut captive_heading: Option<CaptiveHeading<'a>> = None;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(ref mut toc) = self.toc
+            && let Some(EmittingHeading {
+                level,
+                ref mut h_events,
+            }) = toc.emitting_heading
+        {
+            if let Some(event) = h_events.pop() {
+                return Some(event);
+            } else {
+                toc.emitting_heading = None;
+                return Some(Event::End(TagEnd::Heading(level)));
+            }
+        }
 
-        let mut metadata_init = None;
+        let event = self.inner.next()?;
 
-        let bound = 20;
-        let mut events = Vec::with_capacity(bound);
-        let mut slugger = Slugger::with_capacity(bound / 5);
-
-        for event in self {
-            match event {
-                Event::Text(t) => {
-                    if let Some(ch) = captive_heading.as_mut() {
-                        ch.events.push(Event::Text(t));
-                    } else if let Some(s) = captive_string.as_mut() {
-                        s.push_str(&t);
-                    } else {
-                        events.push(Event::Text(t));
-                    }
+        match event {
+            Event::Text(ref t) => {
+                if let Some(ref mut toc) = self.toc
+                    && let Some(ch) = toc.captive_heading.as_mut()
+                {
+                    ch.h_events.push(event);
+                    self.next()
+                } else if let Some(s) = self.captive_string.as_mut() {
+                    s.push_str(t);
+                    self.next()
+                } else {
+                    Some(event)
                 }
+            }
 
-                Event::Start(Tag::Heading {
-                    level,
-                    id,
-                    classes,
-                    attrs,
-                }) if toc.is_some() => {
-                    captive_heading = Some(CaptiveHeading {
+            Event::Start(Tag::CodeBlock(kind)) => {
+                self.captive_string = Some(String::new());
+                self.syntax_token = match kind {
+                    CodeBlockKind::Fenced(lang) => Some(lang),
+                    CodeBlockKind::Indented => None,
+                };
+                self.next()
+            }
+
+            Event::End(TagEnd::CodeBlock) => {
+                if let Some(code) = self.captive_string.take() {
+                    let highlighted = highlight_code(&code, self.syntax_token.as_deref()).ok()?;
+                    return Some(Event::Html(CowStr::from(highlighted)));
+                }
+                self.next()
+            }
+
+            Event::DisplayMath(latex) => {
+                let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
+                Some(Event::Html(CowStr::from(mathml)))
+            }
+
+            Event::InlineMath(ref latex) => {
+                if let Some(ref mut toc) = self.toc
+                    && let Some(h) = toc.captive_heading.as_mut()
+                {
+                    h.h_events.push(event);
+                    self.next()
+                } else {
+                    let mathml =
+                        latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
+                    Some(Event::InlineHtml(CowStr::from(mathml)))
+                }
+            }
+
+            Event::Start(Tag::Heading {
+                level,
+                id,
+                classes,
+                attrs,
+            }) => {
+                if let Some(ref mut toc) = self.toc {
+                    toc.captive_heading = Some(CaptiveHeading {
                         level,
                         id,
                         classes,
                         attrs,
-                        events: Vec::with_capacity(1),
+                        h_events: Vec::with_capacity(1),
                     });
+                    self.next()
+                } else {
+                    Some(Event::Start(Tag::Heading {
+                        level,
+                        id,
+                        classes,
+                        attrs,
+                    }))
                 }
+            }
 
-                Event::End(TagEnd::Heading(_)) => {
-                    if let Some(table) = toc.as_mut() {
-                        let CaptiveHeading {
+            Event::End(TagEnd::Heading(_)) => {
+                if let Some(toc) = self.toc.as_mut() {
+                    let CaptiveHeading {
+                        level,
+                        id,
+                        classes,
+                        attrs,
+                        mut h_events,
+                    } = toc.captive_heading.take().unwrap();
+
+                    let header_text = h_events
+                        .iter()
+                        .filter_map(|event| match event {
+                            Event::Text(s) => Some(s.as_ref()),
+                            Event::Code(c) => Some(c.as_ref()),
+                            Event::InlineMath(m) => Some(m.as_ref()),
+                            _ => None,
+                        })
+                        .collect::<String>();
+
+                    if !header_text.is_empty() {
+                        let id = id.unwrap_or_else(|| CowStr::from(toc.slugger.slug(&header_text)));
+                        toc.table.push_str(&table_bullet(level, &header_text, &id));
+
+                        h_events.reverse();
+                        toc.emitting_heading = Some(EmittingHeading { level, h_events });
+
+                        return Some(Event::Start(Tag::Heading {
                             level,
-                            id,
+                            id: Some(id),
                             classes,
                             attrs,
-                            events: mut h_events,
-                        } = captive_heading.take().unwrap();
-
-                        let header_text = h_events
-                            .iter()
-                            .filter_map(|event| match event {
-                                Event::Text(s) | Event::Code(s) | Event::InlineMath(s) => {
-                                    Some(s.as_ref())
-                                }
-                                _ => None,
-                            })
-                            .collect::<String>();
-
-                        if !header_text.is_empty() {
-                            let id = id.unwrap_or_else(|| CowStr::from(slugger.slug(&header_text)));
-                            table.push_str(&table_bullet(level, &header_text, &id));
-
-                            events.push(Event::Start(Tag::Heading {
-                                level,
-                                id: Some(id),
-                                classes,
-                                attrs,
-                            }));
-
-                            events.append(&mut h_events);
-                        }
-                    }
-
-                    events.push(event);
-                }
-
-                Event::Code(code) if captive_heading.is_some() => {
-                    if let Some(h) = captive_heading.as_mut() {
-                        h.events.push(Event::Code(code));
+                        }));
                     }
                 }
-
-                Event::Start(Tag::CodeBlock(kind)) => {
-                    captive_string = Some(String::new());
-                    syntax_token = match kind {
-                        CodeBlockKind::Fenced(lang) => Some(lang),
-                        CodeBlockKind::Indented => None,
-                    };
-                }
-
-                Event::End(TagEnd::CodeBlock) => {
-                    if let Some(code) = captive_string.take() {
-                        let highlighted = highlight_code(&code, syntax_token.as_deref())?;
-                        let event = Event::Html(CowStr::from(highlighted));
-                        events.push(event);
-                    }
-                }
-
-                Event::DisplayMath(latex) => {
-                    let mathml = latex_to_mathml(&latex, &mut storage, DisplayMode::Block)?;
-                    let event = Event::Html(CowStr::from(mathml));
-                    events.push(event);
-                }
-
-                Event::InlineMath(ref latex) => {
-                    if let Some(h) = captive_heading.as_mut() {
-                        h.events.push(event);
-                    } else {
-                        let mathml = latex_to_mathml(latex, &mut storage, DisplayMode::Inline)?;
-                        let event = Event::InlineHtml(CowStr::from(mathml));
-                        events.push(event);
-                    }
-                }
-
-                Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle)) => {
-                    captive_string = Some(String::new())
-                }
-
-                Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle)) => {
-                    if let Some(yaml) = captive_string.take() {
-                        let docs = YamlLoader::load_from_str(&yaml)?;
-
-                        (metadata_init, toc) = parse_metadata(docs)
-                            .map(|(init, has_toc)| (Some(init), has_toc.then(String::new)))
-                            .unwrap_or((None, None));
-                    }
-                }
-
-                _ => events.push(event),
+                Some(event)
             }
-        }
 
-        metadata_init
-            .map(|metadata| Article {
-                frontmatter: metadata,
-                events,
-                toc,
-            })
-            .ok_or_else(|| Error::msg("Metadata error"))
+            Event::Code(code) => {
+                if let Some(ref mut toc) = self.toc
+                    && let Some(h) = toc.captive_heading.as_mut()
+                {
+                    h.h_events.push(Event::Code(code));
+                }
+                self.next()
+            }
+
+            _ => Some(event),
+        }
     }
 }
 
@@ -206,6 +227,25 @@ fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
     Ok(format!("<pre><code>{}</code></pre>", class_gen.finalize()))
 }
 
+pub(crate) fn process_metadata(mut parser: Parser) -> Option<(Frontmatter, bool)> {
+    match parser.next() {
+        Some(Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
+        _ => return None,
+    }
+
+    let yaml = match parser.next() {
+        Some(Event::Text(text)) => text,
+        _ => return None,
+    };
+
+    match parser.next() {
+        Some(Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
+        _ => return None,
+    }
+
+    parse_metadata(YamlLoader::load_from_str(&yaml).ok()?)
+}
+
 fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, bool)> {
     let doc = docs.first()?;
     let title = doc["title"].as_str()?.to_string();
@@ -223,15 +263,6 @@ fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, bool)> {
         },
         create_toc,
     ))
-}
-
-pub(crate) fn extract_metadata(markdown: &str) -> Option<Frontmatter> {
-    let start = markdown.find("---\n")?;
-    let rest = &markdown[start + 4..];
-    let end = rest.find("\n---\n")?;
-    let yaml_str = &rest[..end];
-    let docs = YamlLoader::load_from_str(yaml_str).ok()?;
-    parse_metadata(docs).map(|x| x.0)
 }
 
 pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor_id: &str) -> String {

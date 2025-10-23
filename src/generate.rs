@@ -1,10 +1,10 @@
 use crate::{
     atom::generate_atom_feed,
     sitemap::generate_sitemap,
-    syntex::{Custom, OPTIONS, extract_metadata},
-    types::{Article, Entries, Frontmatter},
+    syntex::{CustomIterator, OPTIONS, process_metadata},
+    types::{Entries, Frontmatter},
 };
-use anyhow::{Context, Result};
+use anyhow::{Context, Error, Result};
 use chrono::{DateTime, Utc};
 use pulldown_cmark::{Parser, html::write_html_io};
 use std::io::{BufWriter, Write};
@@ -22,33 +22,23 @@ fn render_markdown(
 ) -> Result<Frontmatter> {
     let markdown = fs::read_to_string(src)?;
 
-    if dst.exists() && dst.metadata()?.modified()? > modified {
-        return extract_metadata(&markdown)
-            .with_context(|| format!("Invalid frontmatter, {}", src.to_string_lossy()));
-    }
+    let (frontmatter, has_toc) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
+        .ok_or_else(|| Error::msg("Metadata error"))?;
 
-    let Article {
-        events,
-        frontmatter,
-        toc,
-    } = Parser::new_ext(&markdown, OPTIONS).process()?;
+    if dst.exists() && dst.metadata()?.modified()? > modified {
+        return Ok(frontmatter);
+    }
 
     let file = fs::File::create(dst)?;
     let mut writer = BufWriter::new(file);
 
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
-    if let Some(table) = toc {
-        let table = Parser::new(&table);
-        writer.write_all(b"<details><summary> Table of contents </summary>")?;
-        write_html_io(&mut writer, table)?;
-        writer.write_all(b"</details>")?;
-    }
+    let parser = Parser::new_ext(&markdown, OPTIONS);
+    let processed = CustomIterator::new(parser, has_toc);
 
-    write_html_io(&mut writer, events.into_iter())?;
-
+    write_html_io(&mut writer, processed)?;
     writer.write_all(FOOTER.as_bytes())?;
-
     writer.flush()?;
 
     Ok(frontmatter)
@@ -122,17 +112,21 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 
 pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
-    let Article {
-        frontmatter: metadata,
-        events,
-        ..
-    } = Parser::new_ext(&index_md, OPTIONS).process()?;
+
+    // Extract metadata first
+    let (metadata, has_toc) = process_metadata(Parser::new_ext(&index_md, OPTIONS))
+        .ok_or_else(|| Error::msg("Metadata error"))?;
 
     let file = fs::File::create(html_dir.join("index.html"))?;
     let mut writer = BufWriter::new(file);
 
     writer.write_all(metadata.header("").as_bytes())?;
-    write_html_io(&mut writer, events.into_iter())?;
+
+    // Stream the processed events directly to HTML
+    let parser = Parser::new_ext(&index_md, OPTIONS);
+    let processed = CustomIterator::new(parser, has_toc);
+    write_html_io(&mut writer, processed)?;
+
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
