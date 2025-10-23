@@ -1,7 +1,8 @@
 use crate::{
     atom::generate_atom_feed,
     sitemap::generate_sitemap,
-    syntex::{CustomIterator, OPTIONS, TocIterator, process_metadata},
+    syntex::{CustomIterator, OPTIONS, process_metadata},
+    toc::TocIterator,
     types::{Entries, Frontmatter},
 };
 use anyhow::{Context, Error, Result};
@@ -44,9 +45,9 @@ fn render_markdown(
         write_html_io(&mut writer, iter)?;
         writer.write_all(b"</div>")?;
 
-        let toc = toc_string.borrow();
+        let toc = toc_string.take();
         let table = Parser::new(&toc);
-        writer.write_all(b"<aside><details><summary>Table of contents</summary>")?;
+        writer.write_all(b"<aside><details><summary> Table of contents </summary>")?;
         write_html_io(&mut writer, table)?;
         writer.write_all(b"</details></aside>")?;
 

@@ -1,13 +1,10 @@
-use crate::{
-    types::{CaptiveHeading, EmittingHeading, Frontmatter},
-    utils::Slugger,
-};
+use crate::types::Frontmatter;
 use anyhow::Result;
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Options, Parser, Tag, TagEnd,
 };
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
-use std::{cell::RefCell, rc::Rc, sync::OnceLock};
+use std::sync::OnceLock;
 use syntect::{
     html::{ClassStyle, ClassedHTMLGenerator},
     parsing::SyntaxSet,
@@ -21,7 +18,7 @@ pub(crate) const OPTIONS: Options = Options::empty()
 
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
 
-fn latex_to_mathml(
+pub(crate) fn latex_to_mathml(
     latex: &str,
     storage: &mut Storage,
     display_mode: DisplayMode,
@@ -39,7 +36,7 @@ fn latex_to_mathml(
     Ok(mathml)
 }
 
-fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
+pub(crate) fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
     let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
     let syntax = syntax_token
         .and_then(|t| syntax_set.find_syntax_by_token(t))
@@ -153,167 +150,6 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 let mathml =
                     latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?;
                 Some(Event::InlineHtml(CowStr::from(mathml)))
-            }
-
-            _ => Some(event),
-        }
-    }
-}
-
-pub(crate) struct TocIterator<'a, I: Iterator<Item = Event<'a>>> {
-    inner: I,
-    syntax_token: Option<CowStr<'a>>,
-    storage: Storage,
-    captive_string: Option<String>,
-    table: Rc<RefCell<String>>,
-    captive_heading: Option<CaptiveHeading<'a>>,
-    emitting_heading: Option<EmittingHeading<'a>>,
-    slugger: Slugger,
-}
-
-impl<'a, I: Iterator<Item = Event<'a>>> TocIterator<'a, I> {
-    pub(crate) fn new(inner: I) -> (Self, Rc<RefCell<String>>) {
-        let table = Rc::new(RefCell::new(String::new()));
-
-        let iter = Self {
-            inner,
-            syntax_token: None,
-            storage: Storage::new(),
-            captive_string: None,
-            table: Rc::clone(&table),
-            captive_heading: None,
-            emitting_heading: None,
-            slugger: Slugger::with_capacity(4),
-        };
-
-        (iter, table)
-    }
-}
-
-impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
-    type Item = Event<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(EmittingHeading {
-            level,
-            ref mut h_events,
-        }) = self.emitting_heading
-        {
-            if let Some(event) = h_events.pop() {
-                return Some(event);
-            } else {
-                self.emitting_heading = None;
-                return Some(Event::End(TagEnd::Heading(level)));
-            }
-        }
-
-        let event = self.inner.next()?;
-
-        match event {
-            Event::Text(ref t) => {
-                if let Some(ch) = self.captive_heading.as_mut() {
-                    ch.h_events.push(event);
-                    self.next()
-                } else if let Some(s) = self.captive_string.as_mut() {
-                    s.push_str(t);
-                    self.next()
-                } else {
-                    Some(event)
-                }
-            }
-
-            Event::Start(Tag::CodeBlock(kind)) => {
-                self.captive_string = Some(String::new());
-                self.syntax_token = match kind {
-                    CodeBlockKind::Fenced(lang) => Some(lang),
-                    CodeBlockKind::Indented => None,
-                };
-                self.next()
-            }
-
-            Event::End(TagEnd::CodeBlock) => {
-                if let Some(code) = self.captive_string.take() {
-                    let highlighted = highlight_code(&code, self.syntax_token.as_deref()).ok()?;
-                    return Some(Event::Html(CowStr::from(highlighted)));
-                }
-                self.next()
-            }
-
-            Event::DisplayMath(latex) => {
-                let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
-                Some(Event::Html(CowStr::from(mathml)))
-            }
-
-            Event::InlineMath(ref latex) => {
-                if let Some(h) = self.captive_heading.as_mut() {
-                    h.h_events.push(event);
-                    self.next()
-                } else {
-                    let mathml =
-                        latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
-                    Some(Event::InlineHtml(CowStr::from(mathml)))
-                }
-            }
-
-            Event::Start(Tag::Heading {
-                level,
-                id,
-                classes,
-                attrs,
-            }) => {
-                self.captive_heading = Some(CaptiveHeading {
-                    level,
-                    id,
-                    classes,
-                    attrs,
-                    h_events: Vec::with_capacity(1),
-                });
-                self.next()
-            }
-
-            Event::End(TagEnd::Heading(_)) => {
-                let CaptiveHeading {
-                    level,
-                    id,
-                    classes,
-                    attrs,
-                    mut h_events,
-                } = self.captive_heading.take().unwrap();
-
-                let header_text = h_events
-                    .iter()
-                    .filter_map(|event| match event {
-                        Event::Text(s) => Some(s.as_ref()),
-                        Event::Code(c) => Some(c.as_ref()),
-                        Event::InlineMath(m) => Some(m.as_ref()),
-                        _ => None,
-                    })
-                    .collect::<String>();
-
-                if !header_text.is_empty() {
-                    let id = id.unwrap_or_else(|| CowStr::from(self.slugger.slug(&header_text)));
-                    self.table
-                        .borrow_mut()
-                        .push_str(&table_bullet(level, &header_text, &id));
-
-                    h_events.reverse();
-                    self.emitting_heading = Some(EmittingHeading { level, h_events });
-
-                    return Some(Event::Start(Tag::Heading {
-                        level,
-                        id: Some(id),
-                        classes,
-                        attrs,
-                    }));
-                }
-                Some(event)
-            }
-
-            Event::Code(code) => {
-                if let Some(h) = self.captive_heading.as_mut() {
-                    h.h_events.push(Event::Code(code));
-                }
-                self.next()
             }
 
             _ => Some(event),
