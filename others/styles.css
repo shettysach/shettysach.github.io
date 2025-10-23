@@ -62,6 +62,20 @@ header nav {
   font-size: 1.25rem;
 }
 
+.flex-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.flex-wrapper > div {
+  order: 2;
+}
+
+.flex-wrapper > aside {
+  order: 1 !important;
+}
+
 details {
   background: var(--bg-surface-blur);
   padding: 0.5rem;

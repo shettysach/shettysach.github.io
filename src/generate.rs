@@ -1,7 +1,7 @@
 use crate::{
     atom::generate_atom_feed,
     sitemap::generate_sitemap,
-    syntex::{CustomIterator, OPTIONS, process_metadata},
+    syntex::{CustomIterator, OPTIONS, TocIterator, process_metadata},
     types::{Entries, Frontmatter},
 };
 use anyhow::{Context, Error, Result};
@@ -35,9 +35,26 @@ fn render_markdown(
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
     let parser = Parser::new_ext(&markdown, OPTIONS);
-    let processed = CustomIterator::new(parser, has_toc);
 
-    write_html_io(&mut writer, processed)?;
+    if has_toc {
+        let (iter, toc_string) = TocIterator::new(parser);
+        writer.write_all(b"<div class=\"flex-wrapper\">")?;
+
+        writer.write_all(b"<div>")?;
+        write_html_io(&mut writer, iter)?;
+        writer.write_all(b"</div>")?;
+
+        let toc = toc_string.borrow();
+        let table = Parser::new(&toc);
+        writer.write_all(b"<aside><details><summary>Table of contents</summary>")?;
+        write_html_io(&mut writer, table)?;
+        writer.write_all(b"</details></aside>")?;
+
+        writer.write_all(b"</div>")?;
+    } else {
+        write_html_io(&mut writer, CustomIterator::new(parser))?;
+    }
+
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
@@ -114,7 +131,7 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
 
     // Extract metadata first
-    let (metadata, has_toc) = process_metadata(Parser::new_ext(&index_md, OPTIONS))
+    let (metadata, _) = process_metadata(Parser::new_ext(&index_md, OPTIONS))
         .ok_or_else(|| Error::msg("Metadata error"))?;
 
     let file = fs::File::create(html_dir.join("index.html"))?;
@@ -124,7 +141,7 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     // Stream the processed events directly to HTML
     let parser = Parser::new_ext(&index_md, OPTIONS);
-    let processed = CustomIterator::new(parser, has_toc);
+    let processed = CustomIterator::new(parser);
     write_html_io(&mut writer, processed)?;
 
     writer.write_all(FOOTER.as_bytes())?;

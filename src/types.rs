@@ -1,4 +1,3 @@
-use crate::utils::Slugger;
 use chrono::{DateTime, Utc};
 use pulldown_cmark::{CowStr, Event, HeadingLevel};
 
@@ -13,13 +12,6 @@ pub(crate) struct Entries {
     pub(crate) subtitle: Option<String>,
     pub(crate) datetime: DateTime<Utc>,
     pub(crate) url: String,
-}
-
-pub(crate) struct TableOfContents<'a> {
-    pub(crate) table: String,
-    pub(crate) captive_heading: Option<CaptiveHeading<'a>>,
-    pub(crate) emitting_heading: Option<EmittingHeading<'a>>,
-    pub(crate) slugger: Slugger,
 }
 
 pub(crate) struct CaptiveHeading<'a> {
