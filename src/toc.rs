@@ -1,10 +1,10 @@
 use crate::{
-    syntex::{highlight_code, latex_to_mathml, table_bullet},
+    syntex::{highlight_code, latex_to_mathml},
+    types::Levels,
     utils::Slugger,
 };
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
-use std::{cell::RefCell, rc::Rc};
 
 #[derive(Default)]
 pub(crate) enum HeadingT<'a> {
@@ -25,26 +25,24 @@ pub(crate) struct TocIterator<'a, I: Iterator<Item = Event<'a>>> {
     syntax_token: Option<CowStr<'a>>,
     storage: Storage,
     captive_string: Option<String>,
-    table: Rc<RefCell<String>>,
+    table: &'a mut String,
+    levels: Levels,
     heading: HeadingT<'a>,
     slugger: Slugger,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> TocIterator<'a, I> {
-    pub(crate) fn new(inner: I) -> (Self, Rc<RefCell<String>>) {
-        let table = Rc::new(RefCell::new(String::new()));
-
-        let iter = Self {
+    pub(crate) fn new(inner: I, h: Levels, table: &'a mut String) -> Self {
+        Self {
             inner,
             syntax_token: None,
             storage: Storage::new(),
             captive_string: None,
-            table: Rc::clone(&table),
+            table,
+            levels: h,
             heading: HeadingT::Inactive,
-            slugger: Slugger::with_capacity(4),
-        };
-
-        (iter, table)
+            slugger: Slugger::with_capacity(5),
+        }
     }
 }
 
@@ -70,6 +68,15 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                     self.next()
                 } else if let Some(s) = self.captive_string.as_mut() {
                     s.push_str(t);
+                    self.next()
+                } else {
+                    Some(event)
+                }
+            }
+
+            Event::Code(_) => {
+                if let HeadingT::Capturing(ref mut h_events, ..) = self.heading {
+                    h_events.push(event);
                     self.next()
                 } else {
                     Some(event)
@@ -114,7 +121,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 id,
                 classes,
                 attrs,
-            }) => {
+            }) if self.levels.level_enabled(level) => {
                 self.heading =
                     HeadingT::Capturing(Vec::with_capacity(1), level, id, classes, attrs);
                 self.next()
@@ -140,8 +147,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                             .unwrap_or_else(|| CowStr::from(self.slugger.slug(&header_text)));
 
                         self.table
-                            .borrow_mut()
-                            .push_str(&table_bullet(level, &header_text, &id));
+                            .push_str(&table_bullet(level, self.levels, &header_text, &id));
 
                         h_events.reverse();
 
@@ -158,14 +164,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 Some(event)
             }
 
-            Event::Code(code) => {
-                if let HeadingT::Capturing(ref mut h_events, ..) = self.heading {
-                    h_events.push(Event::Code(code));
-                }
-                self.next()
-            }
-
             _ => Some(event),
         }
     }
+}
+
+pub(crate) fn table_bullet(
+    level: HeadingLevel,
+    h: Levels,
+    heading: &str,
+    anchor_id: &str,
+) -> String {
+    let count = Levels::level_to_u8(level) - h.min_level();
+    let indent = "  ".repeat(count as usize);
+    format!("{indent}- [{heading}](#{anchor_id})\n")
 }

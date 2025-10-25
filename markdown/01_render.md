@@ -6,7 +6,6 @@ tags:
     - Blog
     - Rust
     - LaTeX
-<!-- toc: true -->
 ---
 
 # Rendering math and highlighting code
@@ -26,7 +25,7 @@ $$
 
 LaTeX is a high-quality typesetting system; it includes features designed for the production of technical and scientific documentation. LaTeX is the de facto standard for the communication and publication of scientific documents. LaTeX is available as free software. [[The Latex Project]](https://www.latex-project.org/)
 
-```
+```latex
 \sum_{i=1}^{n} i^3 = \left( \frac{n(n+1)}{2} \right) ^2
 ```
 _LaTeX representation of the above equation_
@@ -77,7 +76,7 @@ $$
 
 written as
   
-```tex
+```latex
 $$
 F(n) =
 \begin{cases}
@@ -114,15 +113,15 @@ like keywords, variables and constants. This enables for syntax highlighting
 through CSS classes, which makes it easy to have colours assigned to different elements.
 
 ```html
-<pre><code><span class="source rust"><span class="meta function rust"><span class="meta function rust"><span class="storage type function rust">fn</span> </span><span class="entity name function rust">sum_of_cubes_lhs</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">(</span><span class="variable parameter rust">n</span><span class="punctuation separator rust">:</span> <span class="storage type rust">usize</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters end rust">)</span></span></span></span><span class="meta function rust"> <span class="meta function return-type rust"><span class="punctuation separator rust">-&gt;</span> <span class="storage type rust">usize</span></span> </span><span class="meta function rust"><span class="meta block rust"><span class="punctuation section block begin rust">{</span>
-    <span class="meta group rust"><span class="punctuation section group begin rust">(</span><span class="constant numeric integer decimal rust">0</span><span class="keyword operator rust">..</span><span class="keyword operator rust">=</span>n</span><span class="meta group rust"><span class="punctuation section group end rust">)</span></span>.<span class="support function rust">map</span><span class="meta group rust"><span class="punctuation section group begin rust">(</span><span class="meta function closure rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">|</span></span></span><span class="meta function closure rust"><span class="meta function parameters rust"><span class="variable parameter rust">i</span><span class="punctuation section parameters end rust">|</span></span> </span><span class="meta function closure rust">i <span class="keyword operator rust">*</span> i <span class="keyword operator rust">*</span> i</span></span><span class="meta group rust"><span class="punctuation section group end rust">)</span></span>.<span class="support function rust">sum</span><span class="meta group rust"><span class="punctuation section group begin rust">(</span></span><span class="meta group rust"><span class="punctuation section group end rust">)</span></span>
-</span><span class="meta block rust"><span class="punctuation section block end rust">}</span></span></span>
-
-<span class="meta function rust"><span class="meta function rust"><span class="storage type function rust">fn</span> </span><span class="entity name function rust">sum_of_cubes_rhs</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters begin rust">(</span><span class="variable parameter rust">n</span><span class="punctuation separator rust">:</span> <span class="storage type rust">usize</span></span><span class="meta function rust"><span class="meta function parameters rust"><span class="punctuation section parameters end rust">)</span></span></span></span><span class="meta function rust"> <span class="meta function return-type rust"><span class="punctuation separator rust">-&gt;</span> <span class="storage type rust">usize</span></span> </span><span class="meta function rust"><span class="meta block rust"><span class="punctuation section block begin rust">{</span>
-    <span class="storage type rust">let</span> s <span class="keyword operator rust">=</span> n <span class="keyword operator rust">*</span> <span class="meta group rust"><span class="punctuation section group begin rust">(</span>n <span class="keyword operator rust">+</span> <span class="constant numeric integer decimal rust">1</span></span><span class="meta group rust"><span class="punctuation section group end rust">)</span></span> <span class="keyword operator rust">/</span> <span class="constant numeric integer decimal rust">2</span><span class="punctuation terminator rust">;</span>
-    s <span class="keyword operator rust">*</span> s
-</span><span class="meta block rust"><span class="punctuation section block end rust">}</span></span></span>
-</span></code></pre>
+<pre class="athl"><code class="language-rust" translate="no" tabindex="0"><div class="line" data-line="1"><span class="keyword-function">fn</span> <span class="function">sum_of_cubes_lhs</span><span class="punctuation-bracket">(</span><span class="variable-parameter">n</span><span class="punctuation-delimiter">:</span> <span class="type-builtin">usize</span><span class="punctuation-bracket">)</span> <span class="punctuation-delimiter">-&gt;</span> <span class="type-builtin">usize</span> <span class="punctuation-bracket">&lbrace;</span>
+</div><div class="line" data-line="2">    <span class="punctuation-bracket">(</span><span class="number">2</span><span class="operator">..=</span><span class="variable">n</span><span class="punctuation-bracket">)</span><span class="punctuation-delimiter">.</span><span class="function-call">map</span><span class="punctuation-bracket">(</span><span class="punctuation-bracket">|</span><span class="variable-parameter">i</span><span class="punctuation-bracket">|</span> <span class="variable">i</span> <span class="operator">*</span> <span class="variable">i</span> <span class="operator">*</span> <span class="variable">i</span><span class="punctuation-bracket">)</span><span class="punctuation-delimiter">.</span><span class="function-call">sum</span><span class="punctuation-bracket">(</span><span class="punctuation-bracket">)</span>
+</div><div class="line" data-line="3"><span class="punctuation-bracket">&rbrace;</span>
+</div><div class="line" data-line="4">
+</div><div class="line" data-line="5"><span class="keyword-function">fn</span> <span class="function">sum_of_cubes_rhs</span><span class="punctuation-bracket">(</span><span class="variable-parameter">n</span><span class="punctuation-delimiter">:</span> <span class="type-builtin">usize</span><span class="punctuation-bracket">)</span> <span class="punctuation-delimiter">-&gt;</span> <span class="type-builtin">usize</span> <span class="punctuation-bracket">&lbrace;</span>
+</div><div class="line" data-line="6">    <span class="keyword">let</span> <span class="variable">s</span> <span class="operator">=</span> <span class="variable">n</span> <span class="operator">*</span> <span class="punctuation-bracket">(</span><span class="variable">n</span> <span class="operator">+</span> <span class="number">1</span><span class="punctuation-bracket">)</span> <span class="operator">/</span> <span class="number">2</span><span class="punctuation-delimiter">;</span>
+</div><div class="line" data-line="7">    <span class="variable">s</span> <span class="operator">*</span> <span class="variable">s</span>
+</div><div class="line" data-line="8"><span class="punctuation-bracket">&rbrace;</span>
+</div></code></pre>
 ```
 _Generated HTML with style classes for the above code_
 

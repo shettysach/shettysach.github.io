@@ -23,7 +23,7 @@ fn render_markdown(
 ) -> Result<Frontmatter> {
     let markdown = fs::read_to_string(src)?;
 
-    let (frontmatter, has_toc) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
+    let (frontmatter, toc) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
         .ok_or_else(|| Error::msg("Metadata error"))?;
 
     if dst.exists() && dst.metadata()?.modified()? > modified {
@@ -37,16 +37,16 @@ fn render_markdown(
 
     let parser = Parser::new_ext(&markdown, OPTIONS);
 
-    if has_toc {
-        let (iter, toc_string) = TocIterator::new(parser);
+    if let Some(levels) = toc {
+        let mut toc_string = String::new();
+        let iter = TocIterator::new(parser, levels, &mut toc_string);
         writer.write_all(b"<div class=\"flex-wrapper\">")?;
 
         writer.write_all(b"<div>")?;
         write_html_io(&mut writer, iter)?;
         writer.write_all(b"</div>")?;
 
-        let toc = toc_string.take();
-        let table = Parser::new(&toc);
+        let table = Parser::new(&toc_string);
         writer.write_all(b"<aside><details><summary> Table of contents </summary>")?;
         write_html_io(&mut writer, table)?;
         writer.write_all(b"</details></aside>")?;

@@ -1,9 +1,7 @@
-use crate::types::Frontmatter;
+use crate::types::{Frontmatter, Levels};
 use anyhow::Result;
 use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
-use pulldown_cmark::{
-    CodeBlockKind, CowStr, Event, HeadingLevel, MetadataBlockKind, Parser, Tag, TagEnd,
-};
+use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Parser, Tag, TagEnd};
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
 use yaml_rust2::{Yaml, YamlLoader};
 
@@ -11,81 +9,6 @@ pub(crate) const OPTIONS: pulldown_cmark::Options = pulldown_cmark::Options::emp
     .union(pulldown_cmark::Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(pulldown_cmark::Options::ENABLE_MATH)
     .union(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
-
-pub(crate) fn latex_to_mathml(
-    latex: &str,
-    storage: &mut Storage,
-    display_mode: DisplayMode,
-) -> Result<String> {
-    let mut mathml = String::new();
-    let parser = pulldown_latex::Parser::new(latex, storage);
-
-    let config = RenderConfig {
-        display_mode,
-        ..Default::default()
-    };
-
-    push_mathml(&mut mathml, parser, config)?;
-    storage.reset();
-    Ok(mathml)
-}
-
-pub(crate) fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
-    let formatter = HtmlLinkedBuilder::new()
-        .source(code)
-        .lang(match syntax_token {
-            Some("rust") => Language::Rust,
-            Some("html") => Language::HTML,
-            Some("latex") => Language::LaTeX,
-            _ => Language::PlainText,
-        })
-        .pre_class(None)
-        .build()?;
-
-    let mut output = Vec::new();
-    formatter.format(&mut output)?;
-    let html = String::from_utf8(output)?;
-
-    Ok(html)
-}
-
-pub(crate) fn process_metadata(mut parser: Parser) -> Option<(Frontmatter, bool)> {
-    match parser.next() {
-        Some(Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
-        _ => return None,
-    }
-
-    let yaml = match parser.next() {
-        Some(Event::Text(text)) => text,
-        _ => return None,
-    };
-
-    match parser.next() {
-        Some(Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
-        _ => return None,
-    }
-
-    parse_metadata(YamlLoader::load_from_str(&yaml).ok()?)
-}
-
-fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, bool)> {
-    let doc = docs.first()?;
-    let title = doc["title"].as_str()?.to_string();
-    let subtitle = doc["subtitle"].as_str().map(str::to_string);
-    let tags = doc["tags"]
-        .as_vec()
-        .and_then(|vec| vec.iter().map(|v| v.as_str().map(String::from)).collect());
-    let create_toc = doc["toc"].as_bool().is_some_and(|t| t);
-
-    Some((
-        Frontmatter {
-            title,
-            subtitle,
-            tags,
-        },
-        create_toc,
-    ))
-}
 
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
@@ -154,14 +77,82 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
     }
 }
 
-pub(crate) fn table_bullet(level: HeadingLevel, heading: &str, anchor_id: &str) -> String {
-    let indent = "  ".repeat(match level {
-        HeadingLevel::H1 => 0,
-        HeadingLevel::H2 => 1,
-        HeadingLevel::H3 => 2,
-        HeadingLevel::H4 => 3,
-        HeadingLevel::H5 => 4,
-        HeadingLevel::H6 => 5,
+pub(crate) fn latex_to_mathml(
+    latex: &str,
+    storage: &mut Storage,
+    display_mode: DisplayMode,
+) -> Result<String> {
+    let mut mathml = String::new();
+    let parser = pulldown_latex::Parser::new(latex, storage);
+
+    let config = RenderConfig {
+        display_mode,
+        ..Default::default()
+    };
+
+    push_mathml(&mut mathml, parser, config)?;
+    storage.reset();
+    Ok(mathml)
+}
+
+pub(crate) fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
+    let formatter = HtmlLinkedBuilder::new()
+        .source(code)
+        .lang(match syntax_token {
+            Some("rust") => Language::Rust,
+            Some("html") => Language::HTML,
+            Some("latex") => Language::LaTeX,
+            _ => Language::PlainText,
+        })
+        .pre_class(None)
+        .build()?;
+
+    let mut output = Vec::new();
+    formatter.format(&mut output)?;
+    let html = String::from_utf8(output)?;
+
+    Ok(html)
+}
+
+pub(crate) fn process_metadata(mut parser: Parser) -> Option<(Frontmatter, Option<Levels>)> {
+    match parser.next() {
+        Some(Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
+        _ => return None,
+    }
+
+    let yaml = match parser.next() {
+        Some(Event::Text(text)) => text,
+        _ => return None,
+    };
+
+    match parser.next() {
+        Some(Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
+        _ => return None,
+    }
+
+    parse_metadata(YamlLoader::load_from_str(&yaml).ok()?)
+}
+
+fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, Option<Levels>)> {
+    let doc = docs.first()?;
+    let title = doc["title"].as_str()?.to_string();
+    let subtitle = doc["subtitle"].as_str().map(str::to_string);
+    let tags = doc["tags"]
+        .as_vec()
+        .and_then(|vec| vec.iter().map(|v| v.as_str().map(String::from)).collect());
+
+    let levels = doc["toc"].as_vec().and_then(|vec| {
+        let l = vec.first()?.as_i64()?.try_into().ok()?;
+        let h = vec.get(1)?.as_i64()?.try_into().ok()?;
+        Levels::new(l, h)
     });
-    format!("{indent}- [{heading}](#{anchor_id})\n")
+
+    Some((
+        Frontmatter {
+            title,
+            subtitle,
+            tags,
+        },
+        levels,
+    ))
 }

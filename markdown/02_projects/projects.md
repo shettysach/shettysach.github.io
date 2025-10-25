@@ -2,6 +2,7 @@
 title: Projects
 subtitle: A post to display my personal projects
 tags: [ Rust, Python, Odin, Haskell ]
+toc: [1, 2]
 ---
 
 # Projects
