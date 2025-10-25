@@ -139,13 +139,16 @@ fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, Option<Levels>)> {
     let subtitle = doc["subtitle"].as_str().map(str::to_string);
     let tags = doc["tags"]
         .as_vec()
-        .and_then(|vec| vec.iter().map(|v| v.as_str().map(String::from)).collect());
+        .and_then(|vec| vec.iter().map(|v| v.as_str().map(str::to_string)).collect());
 
-    let levels = doc["toc"].as_vec().and_then(|vec| {
-        let l = vec.first()?.as_i64()?.try_into().ok()?;
-        let h = vec.get(1)?.as_i64()?.try_into().ok()?;
-        Levels::new(l, h)
-    });
+    let levels = doc["hmin"]
+        .as_i64()
+        .zip(doc["hmax"].as_i64())
+        .and_then(|(min, max)| {
+            let min: u8 = min.try_into().ok()?;
+            let max: u8 = max.try_into().ok()?;
+            Levels::new(min, max)
+        });
 
     Some((
         Frontmatter {

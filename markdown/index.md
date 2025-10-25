@@ -9,7 +9,9 @@ subtitle: Welcome to my blog
 
 Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers and programming language compilers. I am also interested in learning about information theory, deep learning and functional programming. I currently use Rust, Python, C++ and C. 
 
-This is my personal website, built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [autumnus](https://crates.io/crates/autumnus). It uses static HTML and CSS, generated from Markdown.
+This is my personal website, built with [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [autumnus](https://crates.io/crates/autumnus). It uses static HTML generated from Markdown and the Tokyo Night colorscheme.
+
+## Projects
 
 Here are some of my personal projects. For more detail, read this [article](./02_projects/projects.html).
 
@@ -22,7 +24,10 @@ Here are some of my personal projects. For more detail, read this [article](./02
 - [Cohle](https://www.github.com/shettysach/cohle) - Rust CLI that prints Rust Cohle quotes
 - [Liquid-Oxygen](https://www.github.com/shettysach/Liquid-Oxygen) - Tree-walk interpreter for Lox written in Haskell
 
-You can visit my [GitHub](https://www.github.com/shettysach) and contact me via - 
+## Contact 
+
+You can visit my [GitHub](https://www.github.com/shettysach) and contact me via
+
 - Email - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com)
 - X/Twitter - [shettysach_](https://x.com/shettysach_)
-- LinkedIn - [sachithshetty314](https://www.linkedin.com/in/sachithshetty314/)
+- LinkedIn - [/in/sachithshetty314](https://www.linkedin.com/in/sachithshetty314/)

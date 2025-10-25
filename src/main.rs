@@ -20,7 +20,6 @@ fn main() -> Result<()> {
 
     generate::ssgenerate(input_dir, output_dir)?;
     utils::copy_directory(others_dir, output_dir)?;
-    // utils::generate_code_css(styles_dir)?;
 
     Ok(())
 }

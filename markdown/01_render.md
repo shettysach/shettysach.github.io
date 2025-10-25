@@ -15,7 +15,7 @@ The relevant code for this section can be found [here](https://github.com/shetty
 
 ---
 
-## Rendering math { #math }
+## Rendering math
 
 $$
 \sum_{i=1}^{n} i^3 = \left( \frac{n(n+1)}{2} \right) ^2
@@ -43,7 +43,9 @@ MathML Core is a subset with increased implementation details based on rules fro
 ```
 _MathML representation of the above equation_
 
-To convert from LaTeX to MathML, [`pulldown_cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math and code sections. When `pulldown-cmark` parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown_latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is streamed and the math is rendered. 
+### `pulldown-cmark` and `pulldown-latex`
+
+To convert from LaTeX to MathML, [`pulldown-cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math sections. When pulldown-cmark parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown-latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is streamed and the math is rendered. 
 
 Sum of cubes of the first $n$ natural numbers
 
@@ -89,7 +91,7 @@ $$
   
 ---
 
-## Highlighting code { #code }
+## Highlighting code
 
 ```rust
 fn sum_of_cubes_lhs(n: usize) -> usize {
@@ -102,13 +104,15 @@ fn sum_of_cubes_rhs(n: usize) -> usize {
 }
 ```
 
+### `autumnus` and `tree-sitter`
+
 For syntax highlighting, the blog uses the [`autumnus`](https://crates.io/crates/autumnus) crate,
-which uses [`Tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood. 
+which uses [`tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood. 
 Tree-sitter powers the highlighting in editors such as 
 [Neovim](https://neovim.io/doc/user/treesitter.html) and [Zed](https://zed.dev/blog/syntax-aware-editing).
 
-When `pulldown-cmark` identifies a codeblock,
-`autumnus` generates HTML with CSS classes for different code elements
+When pulldown-cmark identifies a codeblock,
+autumnus generates HTML with CSS classes for different code elements
 like keywords, variables and constants. This enables for syntax highlighting
 through CSS classes, which makes it easy to have colours assigned to different elements.
 
@@ -145,7 +149,6 @@ Written as
 #### Block display
 
 ```rust
-// rust
 fn fibonacci(n: u32) -> u32 {
     match n {
         0 => 0,
@@ -159,7 +162,6 @@ written as
 
 ````
 ```rust
-// rust
 fn fibonacci(n: u32) -> u32 {
     match n {
         0 => 0,
