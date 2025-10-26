@@ -11,7 +11,7 @@ use std::{fs, path::Path};
 
 fn main() -> Result<()> {
     let input_dir = Path::new("markdown");
-    let others_dir = Path::new("others");
+    let static_dir = Path::new("static");
     let output_dir = Path::new("_site");
 
     if !output_dir.exists() {
@@ -19,7 +19,7 @@ fn main() -> Result<()> {
     }
 
     generate::ssgenerate(input_dir, output_dir)?;
-    utils::copy_directory(others_dir, output_dir)?;
+    utils::copy_directory(static_dir, output_dir)?;
 
     Ok(())
 }

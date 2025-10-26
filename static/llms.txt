@@ -13,6 +13,7 @@ The blog contains articles on various technical topics including:
 ## Navigation
 
 - Home: index.html
+- Articles: articles.html
 - Tags: tags.html
 - Sitemap: sitemap.xml
 - Atom feed: atom.xml

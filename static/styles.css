@@ -211,15 +211,9 @@ header nav ul li {
 }
 
 @media (max-width: 768px) {
-	  body {
-	    background-image:
-	      linear-gradient(rgba(26, 27, 38, 0.8), rgba(26, 27, 38, 0.85)),
-	      url("https://i.pinimg.com/1200x/b0/4d/2b/b04d2b21b79eb38b2e96ae211b77541c.jpg");
-	    background-size: cover, cover;      /* one per layer */
-	    background-position: center, center;
-	    background-repeat: no-repeat, no-repeat;
-	  }
-
+  body {
+    background-position: right center;
+  }
   header,
   footer,
   main {

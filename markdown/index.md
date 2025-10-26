@@ -13,7 +13,7 @@ This is my personal website, built with [pulldown_cmark](https://crates.io/crate
 
 ## Projects
 
-Here are some of my personal projects. For more detail, read this [article](./02_projects/projects.html).
+Here are some of my personal projects. For more detail read this [article](./02_projects/projects.html).
 
 - [Loxi](Loxi) - Bytecode interpreter for Lox written in Odin, extended with support for lists and a web playground 
 - [Ferrograd](https://www.github.com/shettysach/Ferrograd) - Small scalar autograd engine, inspired from Karpathy's micrograd
