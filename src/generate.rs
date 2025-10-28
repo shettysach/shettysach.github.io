@@ -64,7 +64,7 @@ fn render_markdown(
 
 type C = (Vec<String>, Vec<Entries>, HashMap<String, Vec<Rc<String>>>);
 pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
-    let est_count = WalkDir::new(markdown_dir).max_depth(1).into_iter().count() - 4;
+    let est_count = WalkDir::new(markdown_dir).max_depth(1).into_iter().count() - 1;
 
     let mut labels = Vec::with_capacity(est_count);
     let mut entries = Vec::with_capacity(est_count);
