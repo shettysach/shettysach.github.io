@@ -5,8 +5,6 @@ This is a simple blog made using
 - [autumnus](https://crates.io/crates/autumnus) - syntax highlighting
 - [tokyonight](https://github.com/folke/tokyonight.nvim) - Colorscheme
 
-> NOTE: Work in progress.
-
 ## Run
 
 ```sh
