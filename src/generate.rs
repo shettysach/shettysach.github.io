@@ -47,7 +47,7 @@ fn render_markdown(
         writer.write_all(b"</div>")?;
 
         let table = Parser::new(&toc_string);
-        writer.write_all(b"<aside><details><summary> Table of contents </summary>")?;
+        writer.write_all(b"<aside><details><summary>Table of contents</summary>")?;
         write_html_io(&mut writer, table)?;
         writer.write_all(b"</details></aside>")?;
 

@@ -2,30 +2,28 @@
 
 :root {
   /* Base palette */
-  --color-red-500: #f7768e;          
-  --color-orange-400: #ff9e64;       
-  --color-amber-400: #e0af68;        
-  --color-stone-200: #cfc9c2;         
-  --color-green-400: #9ece6a;        
-  --color-teal-300: #73daca;         
-  --color-cyan-200: #b4f9f8;         
+  --color-red-500: #f7768e;
+  --color-orange-400: #ff9e64;
+  --color-amber-400: #e0af68;
+  --color-stone-200: #cfc9c2;
+  --color-green-400: #9ece6a;
+  --color-teal-300: #73daca;
+  --color-cyan-200: #b4f9f8;
   --color-sky-300: #2ac3de;
-  --color-sky-400: #7dcfff;          
-  --color-indigo-400: #7aa2f7;       
-  --color-violet-400: #bb9af7;       
-  --color-slate-200: #c0caf5;        
-  --color-slate-300: #a9b1d6;        
-  --color-slate-400: #9aa5ce;        
-  --color-slate-600: #565f89;        
-  --color-slate-800: #414868;        
-  --color-night-900: #1a1b26;        
-
-  /* Surfaces */
-  --bg-surface-blur: rgba(36, 40, 59, 0.5); 
+  --color-sky-400: #7dcfff;
+  --color-indigo-400: #7aa2f7;
+  --color-violet-400: #bb9af7;
+  --color-slate-200: #c0caf5;
+  --color-slate-300: #a9b1d6;
+  --color-slate-400: #9aa5ce;
+  --color-slate-600: #565f89;
+  --color-slate-800: #414868;
+  --color-night-900: #1a1b26;
+  --bg-surface-blur: rgba(36, 40, 59, 0.5);
 }
 
 body {
-  font-family: "Lora", serif;
+  font-family: "Work Sans", sans-serif;
   margin: 0;
   padding: 0;
   background-color: var(--color-night-900);
@@ -50,6 +48,7 @@ main {
 }
 
 header {
+  font-family: "Lora", serif;
   background: var(--bg-surface-blur);
   position: fixed;
   color: var(--color-slate-200);
@@ -87,12 +86,6 @@ summary {
   list-style-type: none;
 }
 
-summary::marker {
-  font-family: "JetBrains Mono", monospace;
-  content: "+\00A0";
-}
-details[open] > summary::marker { content: "-\00A0"; }
-
 footer {
   background: var(--bg-surface-blur);
   color: var(--color-slate-200);
@@ -103,6 +96,7 @@ footer {
 section { margin-bottom: 2rem; }
 
 h1, h2, h3, h4, h5, h6 {
+  font-family: "Lora", serif;
   font-weight: normal;
   color: var(--color-sky-400);
   margin-bottom: 1rem;
@@ -111,11 +105,11 @@ h1, h2, h3, h4, h5, h6 {
 pre {
   font-family: "JetBrains Mono", monospace;
   background: var(--bg-surface-blur);
+  box-shadow: 0 3px 4px var(--color-night-900);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
   white-space: pre;
-  line-height: 1.375;
 }
 
 code {
@@ -212,7 +206,7 @@ header nav ul li {
 
 @media (max-width: 768px) {
   body {
-    background-position: right center;
+    background-image: none;
   }
   header,
   footer,

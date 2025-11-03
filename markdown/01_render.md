@@ -43,7 +43,7 @@ MathML Core is a subset with increased implementation details based on rules fro
 ```
 _MathML representation of the above equation_
 
-### `pulldown-cmark` and `pulldown-latex`
+### Pulldown-Cmark and Pulldown-Latex
 
 To convert from LaTeX to MathML, [`pulldown-cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math sections. When pulldown-cmark parses the markdown file, it detects the tags for both inline and block math expressions. Then, the LaTeX inside these sections, is converted to MathML using the [`pulldown-latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is streamed and the math is rendered. 
 
@@ -104,7 +104,7 @@ fn sum_of_cubes_rhs(n: usize) -> usize {
 }
 ```
 
-### `autumnus` and `tree-sitter`
+### Autumnus and Tree-sitter
 
 For syntax highlighting, the blog uses the [`autumnus`](https://crates.io/crates/autumnus) crate,
 which uses [`tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood. 

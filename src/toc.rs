@@ -164,7 +164,14 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 Some(event)
             }
 
-            _ => Some(event),
+            _ => {
+                if let HeadingT::Capturing(ref mut h_events, ..) = self.heading {
+                    h_events.push(event);
+                    self.next()
+                } else {
+                    Some(event)
+                }
+            }
         }
     }
 }
