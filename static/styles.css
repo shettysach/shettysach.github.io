@@ -105,7 +105,7 @@ h1, h2, h3, h4, h5, h6 {
 pre {
   font-family: "JetBrains Mono", monospace;
   background: var(--bg-surface-blur);
-  box-shadow: 0 3px 4px var(--color-night-900);
+  box-shadow: 2px 2px 0 0 rgb(0, 0, 0, 0.4);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
@@ -138,10 +138,11 @@ math[display="block"] {
 }
 
 blockquote {
+  font-family: "Lora", serif;
   border-left: 5px solid var(--color-violet-400);
   background: var(--bg-surface-blur);
-  margin: 1rem 0;
-  padding-left: 1rem;
+  box-shadow: 2px 2px 0 0 rgb(0, 0, 0, 0.4);
+  padding: 0.75rem 1.25rem 0.75rem 1.25rem;
 }
 
 ul,

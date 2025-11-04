@@ -22,8 +22,8 @@ pub(crate) enum HeadingT<'a> {
 
 pub(crate) struct TocIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
-    syntax_token: Option<CowStr<'a>>,
     storage: Storage,
+    syntax_tag: Option<CowStr<'a>>,
     captive_string: Option<String>,
     table: &'a mut String,
     levels: Levels,
@@ -35,8 +35,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> TocIterator<'a, I> {
     pub(crate) fn new(inner: I, h: Levels, table: &'a mut String) -> Self {
         Self {
             inner,
-            syntax_token: None,
             storage: Storage::new(),
+            syntax_tag: None,
             captive_string: None,
             table,
             levels: h,
@@ -85,20 +85,23 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
 
             Event::Start(Tag::CodeBlock(kind)) => {
                 self.captive_string = Some(String::new());
-                self.syntax_token = match kind {
+                self.syntax_tag = match kind {
                     CodeBlockKind::Fenced(lang) => Some(lang),
                     CodeBlockKind::Indented => None,
                 };
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock) => {
-                if let Some(code) = self.captive_string.take() {
-                    let highlighted = highlight_code(&code, self.syntax_token.as_deref()).ok()?;
-                    return Some(Event::Html(CowStr::from(highlighted)));
-                }
-                self.next()
-            }
+            Event::End(TagEnd::CodeBlock) => Some(
+                if let Some(code) = self.captive_string.take()
+                    && let Some(lang) = self.syntax_tag.take()
+                {
+                    let highlighted = highlight_code(&code, &lang).ok()?;
+                    Event::Html(CowStr::from(highlighted))
+                } else {
+                    event
+                },
+            ),
 
             Event::DisplayMath(latex) => {
                 let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;

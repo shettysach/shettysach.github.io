@@ -1,19 +1,21 @@
 use crate::types::{Frontmatter, Levels};
 use anyhow::Result;
 use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
-use pulldown_cmark::{CodeBlockKind, CowStr, Event, MetadataBlockKind, Parser, Tag, TagEnd};
+use pulldown_cmark::{
+    CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Parser, Tag, TagEnd,
+};
 use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
 use yaml_rust2::{Yaml, YamlLoader};
 
-pub(crate) const OPTIONS: pulldown_cmark::Options = pulldown_cmark::Options::empty()
-    .union(pulldown_cmark::Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
-    .union(pulldown_cmark::Options::ENABLE_MATH)
-    .union(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
+pub(crate) const OPTIONS: Options = Options::empty()
+    .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
+    .union(Options::ENABLE_MATH)
+    .union(Options::ENABLE_HEADING_ATTRIBUTES);
 
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
-    syntax_token: Option<CowStr<'a>>,
     storage: Storage,
+    syntax_tag: Option<CowStr<'a>>,
     captive_string: Option<String>,
 }
 
@@ -21,8 +23,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
     pub(crate) fn new(inner: I) -> Self {
         Self {
             inner,
-            syntax_token: None,
             storage: Storage::new(),
+            syntax_tag: None,
             captive_string: None,
         }
     }
@@ -46,20 +48,23 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 
             Event::Start(Tag::CodeBlock(kind)) => {
                 self.captive_string = Some(String::new());
-                self.syntax_token = match kind {
+                self.syntax_tag = match kind {
                     CodeBlockKind::Fenced(lang) => Some(lang),
                     CodeBlockKind::Indented => None,
                 };
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock) => {
-                if let Some(code) = self.captive_string.take() {
-                    let highlighted = highlight_code(&code, self.syntax_token.as_deref()).ok()?;
-                    return Some(Event::Html(CowStr::from(highlighted)));
-                }
-                self.next()
-            }
+            Event::End(TagEnd::CodeBlock) => Some(
+                if let Some(code) = self.captive_string.take()
+                    && let Some(lang) = self.syntax_tag.take()
+                {
+                    let highlighted = highlight_code(&code, &lang).ok()?;
+                    Event::Html(CowStr::from(highlighted))
+                } else {
+                    event
+                },
+            ),
 
             Event::DisplayMath(latex) => {
                 let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
@@ -95,13 +100,13 @@ pub(crate) fn latex_to_mathml(
     Ok(mathml)
 }
 
-pub(crate) fn highlight_code(code: &str, syntax_token: Option<&str>) -> Result<String> {
+pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
         .source(code)
-        .lang(match syntax_token {
-            Some("rust") => Language::Rust,
-            Some("html") => Language::HTML,
-            Some("latex") => Language::LaTeX,
+        .lang(match syntax_tag {
+            "rust" => Language::Rust,
+            "html" => Language::HTML,
+            "latex" => Language::LaTeX,
             _ => Language::PlainText,
         })
         .pre_class(None)
