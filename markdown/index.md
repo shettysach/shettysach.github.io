@@ -33,4 +33,5 @@ You can visit my [GitHub](https://www.github.com/shettysach) and contact me via
 
 ## Attribution
 
-This site uses the [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme) colorscheme for styling and for syntax highlighting. The background image is by [Condor Wei](https://unsplash.com/photos/blue-and-black-sky-with-stars-oMcTmNHclZI). The image is also used for Twitter Card and Open Graph previews.
+The colorscheme used for styling and for syntax highlighting is [Tokyo Night](https://github.com/tokyo-night/tokyo-night-vscode-theme).
+The [image](https://unsplash.com/photos/blue-and-black-sky-with-stars-oMcTmNHclZI) used for the background on wider screens, Twitter Card and Open Graph previews is by [Condor Wei](https://unsplash.com/@cwcanchn).
