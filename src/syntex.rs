@@ -37,13 +37,9 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
         let event = self.inner.next()?;
 
         match event {
-            Event::Text(ref t) => {
-                if let Some(s) = self.captive_string.as_mut() {
-                    s.push_str(t);
-                    self.next()
-                } else {
-                    Some(event)
-                }
+            Event::Text(ref t) if let Some(s) = self.captive_string.as_mut() => {
+                s.push_str(t);
+                self.next()
             }
 
             Event::Start(Tag::CodeBlock(kind)) => {
@@ -55,16 +51,13 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock) => Some(
+            Event::End(TagEnd::CodeBlock)
                 if let Some(code) = self.captive_string.take()
-                    && let Some(lang) = self.syntax_tag.take()
-                {
-                    let highlighted = highlight_code(&code, &lang).ok()?;
-                    Event::Html(CowStr::from(highlighted))
-                } else {
-                    event
-                },
-            ),
+                    && let Some(lang) = self.syntax_tag.take() =>
+            {
+                let highlighted = highlight_code(&code, &lang).ok()?;
+                Some(Event::Html(CowStr::from(highlighted)))
+            }
 
             Event::DisplayMath(latex) => {
                 let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;

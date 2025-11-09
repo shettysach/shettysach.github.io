@@ -105,42 +105,6 @@ pub(crate) fn latex_to_mathml(
 }
 ```
 
-### Syntax for math sections
-
-There are two types of math displays,
-
-#### Inline display - $F(n) = n^2$
-
-Written as
-
-```latex
-$F(n) = n^2$
-```
-
-#### Block display
-
-$$
-F(n) =
-\begin{cases}
-0 & \text{if } n = 0, \\
-1 & \text{if } n = 1, \\
-F(n-1) + F(n-2) & \text{if } n \geq 2.
-\end{cases}
-$$
-
-written as
-  
-```latex
-$$
-F(n) =
-\begin{cases}
-0 & \text{if } n = 0, \\
-1 & \text{if } n = 1, \\
-F(n-1) + F(n-2) & \text{if } n \geq 2.
-\end{cases}
-$$
-```
-  
 ---
 
 ## Highlighting code
@@ -154,6 +118,20 @@ fn sum_of_cubes_rhs(n: usize) -> usize {
     let s = n * (n + 1) / 2;
     s * s
 }
+```
+
+Generated HTML with style classes for the above code:
+
+```html
+<pre class="athl"><code class="language-rust" translate="no" tabindex="0"><div class="line" data-line="1"><span class="keyword-function">fn</span> <span class="function">sum_of_cubes_lhs</span><span class="punctuation-bracket">(</span><span class="variable-parameter">n</span><span class="punctuation-delimiter">:</span> <span class="type-builtin">usize</span><span class="punctuation-bracket">)</span> <span class="punctuation-delimiter">-&gt;</span> <span class="type-builtin">usize</span> <span class="punctuation-bracket">&lbrace;</span>
+</div><div class="line" data-line="2">    <span class="punctuation-bracket">(</span><span class="number">2</span><span class="operator">..=</span><span class="variable">n</span><span class="punctuation-bracket">)</span><span class="punctuation-delimiter">.</span><span class="function-call">map</span><span class="punctuation-bracket">(</span><span class="punctuation-bracket">|</span><span class="variable-parameter">i</span><span class="punctuation-bracket">|</span> <span class="variable">i</span> <span class="operator">*</span> <span class="variable">i</span> <span class="operator">*</span> <span class="variable">i</span><span class="punctuation-bracket">)</span><span class="punctuation-delimiter">.</span><span class="function-call">sum</span><span class="punctuation-bracket">(</span><span class="punctuation-bracket">)</span>
+</div><div class="line" data-line="3"><span class="punctuation-bracket">&rbrace;</span>
+</div><div class="line" data-line="4">
+</div><div class="line" data-line="5"><span class="keyword-function">fn</span> <span class="function">sum_of_cubes_rhs</span><span class="punctuation-bracket">(</span><span class="variable-parameter">n</span><span class="punctuation-delimiter">:</span> <span class="type-builtin">usize</span><span class="punctuation-bracket">)</span> <span class="punctuation-delimiter">-&gt;</span> <span class="type-builtin">usize</span> <span class="punctuation-bracket">&lbrace;</span>
+</div><div class="line" data-line="6">    <span class="keyword">let</span> <span class="variable">s</span> <span class="operator">=</span> <span class="variable">n</span> <span class="operator">*</span> <span class="punctuation-bracket">(</span><span class="variable">n</span> <span class="operator">+</span> <span class="number">1</span><span class="punctuation-bracket">)</span> <span class="operator">/</span> <span class="number">2</span><span class="punctuation-delimiter">;</span>
+</div><div class="line" data-line="7">    <span class="variable">s</span> <span class="operator">*</span> <span class="variable">s</span>
+</div><div class="line" data-line="8"><span class="punctuation-bracket">&rbrace;</span>
+</div></code></pre>
 ```
 
 ### Autumnus and Tree-sitter
@@ -188,17 +166,11 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
         let event = self.inner.next()?;
 
         match event {
-            Event::Text(ref t) => {
-                if let Some(s) = self.captive_string.as_mut() {
-                    s.push_str(t);
-                    self.next()
-                } else {
-                    Some(event)
-                }
+            Event::Text(ref t) if let Some(s) = self.captive_string.as_mut() => {
+                s.push_str(t);
+                self.next()
             }
 
-            // ...
-            
             Event::Start(Tag::CodeBlock(kind)) => {
                 self.captive_string = Some(String::new());
                 self.syntax_tag = match kind {
@@ -208,19 +180,17 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock) => Some(
+            Event::End(TagEnd::CodeBlock)
                 if let Some(code) = self.captive_string.take()
-                    && let Some(lang) = self.syntax_tag.take()
-                {
-                    let highlighted = highlight_code(&code, &lang).ok()?;
-                    Event::Html(CowStr::from(highlighted))
-                } else {
-                    event // No highlighting
-                },
-            ),
-
+                    && let Some(lang) = self.syntax_tag.take() =>
+            {
+                let highlighted = highlight_code(&code, &lang).ok()?;
+                Some(Event::Html(CowStr::from(highlighted)))
+            }
 
             // ...
+
+            _ => Some(event), 
         }
     }
 }
@@ -249,56 +219,3 @@ pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
     Ok(html)
 }
 ```
-
-Generated HTML with style classes for the above code:
-```html
-<pre class="athl"><code class="language-rust" translate="no" tabindex="0"><div class="line" data-line="1"><span class="keyword-function">fn</span> <span class="function">sum_of_cubes_lhs</span><span class="punctuation-bracket">(</span><span class="variable-parameter">n</span><span class="punctuation-delimiter">:</span> <span class="type-builtin">usize</span><span class="punctuation-bracket">)</span> <span class="punctuation-delimiter">-&gt;</span> <span class="type-builtin">usize</span> <span class="punctuation-bracket">&lbrace;</span>
-</div><div class="line" data-line="2">    <span class="punctuation-bracket">(</span><span class="number">2</span><span class="operator">..=</span><span class="variable">n</span><span class="punctuation-bracket">)</span><span class="punctuation-delimiter">.</span><span class="function-call">map</span><span class="punctuation-bracket">(</span><span class="punctuation-bracket">|</span><span class="variable-parameter">i</span><span class="punctuation-bracket">|</span> <span class="variable">i</span> <span class="operator">*</span> <span class="variable">i</span> <span class="operator">*</span> <span class="variable">i</span><span class="punctuation-bracket">)</span><span class="punctuation-delimiter">.</span><span class="function-call">sum</span><span class="punctuation-bracket">(</span><span class="punctuation-bracket">)</span>
-</div><div class="line" data-line="3"><span class="punctuation-bracket">&rbrace;</span>
-</div><div class="line" data-line="4">
-</div><div class="line" data-line="5"><span class="keyword-function">fn</span> <span class="function">sum_of_cubes_rhs</span><span class="punctuation-bracket">(</span><span class="variable-parameter">n</span><span class="punctuation-delimiter">:</span> <span class="type-builtin">usize</span><span class="punctuation-bracket">)</span> <span class="punctuation-delimiter">-&gt;</span> <span class="type-builtin">usize</span> <span class="punctuation-bracket">&lbrace;</span>
-</div><div class="line" data-line="6">    <span class="keyword">let</span> <span class="variable">s</span> <span class="operator">=</span> <span class="variable">n</span> <span class="operator">*</span> <span class="punctuation-bracket">(</span><span class="variable">n</span> <span class="operator">+</span> <span class="number">1</span><span class="punctuation-bracket">)</span> <span class="operator">/</span> <span class="number">2</span><span class="punctuation-delimiter">;</span>
-</div><div class="line" data-line="7">    <span class="variable">s</span> <span class="operator">*</span> <span class="variable">s</span>
-</div><div class="line" data-line="8"><span class="punctuation-bracket">&rbrace;</span>
-</div></code></pre>
-```
-
-### Syntax for code sections
-
-Similarly, there are two types of code displays,
-
-####  Inline display - `fibonacci(5)`
-
-Written as
-
-```
-`fibonacci(5)`
-```
-
-#### Block display
-
-```rust
-fn fibonacci(n: u32) -> u32 {
-    match n {
-        0 => 0,
-        1 => 1,
-        _ => fibonacci(n - 1) + fibonacci(n - 2),
-    }
-}
-```
-
-written as
-
-````
-```rust
-fn fibonacci(n: u32) -> u32 {
-    match n {
-        0 => 0,
-        1 => 1,
-        _ => fibonacci(n - 1) + fibonacci(n - 2),
-    }
-}
-```
-````
-
----

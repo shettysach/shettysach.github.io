@@ -20,7 +20,7 @@ These are some of my personal projects.
 ![loxi](./loxi.png)
 
 - Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
-- Extend Lox with first-class lists and native functions for native functions for list operations
+- Extended with lists and native functions for native functions for list operations
 
 ### Languages
 

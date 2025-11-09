@@ -80,10 +80,20 @@ details {
   padding: 0.5rem;
 }
 
-summary {
+details>summary {
+  list-style: none;
   color: var(--color-sky-400);
   cursor: pointer;
-  list-style-type: none;
+}
+summary::-webkit-details-marker {
+  display: none
+}
+summary::before {
+  content: '►';
+  padding-right:0.5rem;
+}
+details[open] summary:before {
+  content: "▼";
 }
 
 footer {
