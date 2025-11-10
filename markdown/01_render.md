@@ -189,8 +189,6 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
             }
 
             // ...
-
-            _ => Some(event), 
         }
     }
 }

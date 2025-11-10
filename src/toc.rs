@@ -6,15 +6,17 @@ use crate::{
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
 
+type HeadingCapture<'a> = (
+    Vec<Event<'a>>,
+    HeadingLevel,
+    Option<CowStr<'a>>,
+    Vec<CowStr<'a>>,
+    Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
+);
+
 #[derive(Default)]
 pub(crate) enum HeadingT<'a> {
-    Capturing(
-        Vec<Event<'a>>,
-        HeadingLevel,
-        Option<CowStr<'a>>,
-        Vec<CowStr<'a>>,
-        Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
-    ),
+    Capturing(Box<HeadingCapture<'a>>),
     Emitting(Vec<Event<'a>>, HeadingLevel),
     #[default]
     Inactive,
@@ -98,13 +100,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 classes,
                 attrs,
             }) if self.levels.level_enabled(level) => {
-                self.heading =
-                    HeadingT::Capturing(Vec::with_capacity(1), level, id, classes, attrs);
+                self.heading = HeadingT::Capturing(Box::new((
+                    Vec::with_capacity(1),
+                    level,
+                    id,
+                    classes,
+                    attrs,
+                )));
                 self.next()
             }
 
-            Event::End(TagEnd::Heading(_))
-                if let HeadingT::Capturing(mut h_events, level, id, classes, attrs) =
+            Event::End(TagEnd::Heading(level_))
+                if let HeadingT::Capturing(box (mut h_events, level, id, classes, attrs)) =
                     std::mem::take(&mut self.heading) =>
             {
                 let header_text = h_events
@@ -135,8 +142,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 }))
             }
 
-            _ if let HeadingT::Capturing(ref mut h_events, ..) = self.heading => {
-                h_events.push(event);
+            _ if let HeadingT::Capturing(ref mut hbox) = self.heading => {
+                hbox.0.push(event);
                 self.next()
             }
 

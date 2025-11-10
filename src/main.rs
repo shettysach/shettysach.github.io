@@ -1,4 +1,5 @@
 #![feature(if_let_guard)]
+#![feature(box_patterns)]
 
 mod atom;
 mod generate;
