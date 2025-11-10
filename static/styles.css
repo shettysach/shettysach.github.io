@@ -114,11 +114,11 @@ h1, h2, h3, h4, h5, h6 {
 pre {
   font-family: "JetBrains Mono", monospace;
   background: var(--auxillary-bg);
-  box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.2);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
   white-space: pre;
+  border: 1px solid var(--color-slate-800);
 }
 
 code {
@@ -150,7 +150,6 @@ blockquote {
   font-family: "Lora", serif;
   border-left: 5px solid var(--color-violet-400);
   background: var(--auxillary-bg);
-  box-shadow: 2px 2px 0 0 rgb(0, 0, 0, 0.4);
   padding: 0.75rem 1.25rem 0.75rem 1.25rem;
 }
 
@@ -180,13 +179,9 @@ a * {
   text-decoration: none;
 }
 
-a:hover {
-  text-decoration: underline;
-}
+a:hover { text-decoration: underline; }
 
-img {
-  max-width: 100%;
-}
+img { max-width: 100%; }
 
 hr {
   color: var(--color-indigo-400);

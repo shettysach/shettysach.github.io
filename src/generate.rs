@@ -98,7 +98,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                 label.push_str(
                     &tags
                         .iter()
-                        .map(|tag| format!("<a href=\"tags.html#{tag}\"><em>{tag}</em></a>"))
+                        .map(|tag| format!("<a href=\"tags.html#{tag}\">{tag}</a>"))
                         .collect::<Vec<String>>()
                         .join(", "),
                 );
@@ -199,7 +199,7 @@ fn generate_tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Pa
     for tag in tags {
         let labels = &tags_map[tag];
         writer.write_all(
-            format!("<br><details><summary id=\"{tag}\"><em>{tag}</em></summary>\n").as_bytes(),
+            format!("<br><details><summary id=\"{tag}\">{tag}</summary>\n").as_bytes(),
         )?;
 
         writer.write_all(b"<ul>\n")?;

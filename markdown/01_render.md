@@ -171,14 +171,12 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 self.next()
             }
 
-            Event::Start(Tag::CodeBlock(kind)) => {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
+                self.syntax_tag = Some(lang);
                 self.captive_string = Some(String::new());
-                self.syntax_tag = match kind {
-                    CodeBlockKind::Fenced(lang) => Some(lang),
-                    CodeBlockKind::Indented => None,
-                };
                 self.next()
             }
+
 
             Event::End(TagEnd::CodeBlock)
                 if let Some(code) = self.captive_string.take()

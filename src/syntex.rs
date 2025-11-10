@@ -15,8 +15,7 @@ pub(crate) const OPTIONS: Options = Options::empty()
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
-    syntax_tag: Option<CowStr<'a>>,
-    captive_string: Option<String>,
+    code_block: Option<(CowStr<'a>, String)>,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
@@ -24,8 +23,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
         Self {
             inner,
             storage: Storage::new(),
-            syntax_tag: None,
-            captive_string: None,
+            code_block: None,
         }
     }
 }
@@ -37,24 +35,17 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
         let event = self.inner.next()?;
 
         match event {
-            Event::Text(ref t) if let Some(s) = self.captive_string.as_mut() => {
+            Event::Text(ref t) if let Some((_, s)) = self.code_block.as_mut() => {
                 s.push_str(t);
                 self.next()
             }
 
-            Event::Start(Tag::CodeBlock(kind)) => {
-                self.captive_string = Some(String::new());
-                self.syntax_tag = match kind {
-                    CodeBlockKind::Fenced(lang) => Some(lang),
-                    CodeBlockKind::Indented => None,
-                };
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
+                self.code_block = Some((lang, String::new()));
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock)
-                if let Some(code) = self.captive_string.take()
-                    && let Some(lang) = self.syntax_tag.take() =>
-            {
+            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code_block.take() => {
                 let highlighted = highlight_code(&code, &lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
             }
