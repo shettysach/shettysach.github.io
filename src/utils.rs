@@ -1,5 +1,4 @@
 use anyhow::Result;
-use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::{fs, path::Path};
 use walkdir::WalkDir;
 use xxhash_rust::xxh32::xxh32;
@@ -30,36 +29,28 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
 // Slugger
 
 pub struct Slugger {
-    counts: FxHashMap<u32, u8>,
+    counts: [u8; 64],
 }
 
 impl Slugger {
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Slugger {
-            counts: FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher),
-        }
+    pub(crate) fn new() -> Self {
+        Slugger { counts: [0; 64] }
     }
 
     pub(crate) fn slug(&mut self, input: &str) -> String {
         let base = slugify(input);
-        let key = hash_str(&base);
+        let key = xxh32(base.as_bytes(), 0).to_le() % 64;
 
-        match self.counts.get_mut(&key) {
-            Some(c) => {
-                *c += 1;
-                format!("{}_{}", base, *c)
-            }
-            None => {
-                self.counts.insert(key, 0);
-                base
-            }
-        }
+        let c = &mut self.counts[key as usize];
+        let slug = if *c != 0 {
+            format!("{}_{}", base, *c)
+        } else {
+            base
+        };
+
+        *c += 1;
+        slug
     }
-}
-
-#[inline]
-fn hash_str(slug: &str) -> u32 {
-    xxh32(slug.as_bytes(), 0).to_le()
 }
 
 fn slugify(s: &str) -> String {

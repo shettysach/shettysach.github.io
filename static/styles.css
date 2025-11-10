@@ -19,7 +19,7 @@
   --color-slate-600: #565f89;
   --color-slate-800: #414868;
   --color-night-900: #1a1b26;
-  --auxillary-bg: rgba(36, 40, 59, 0.5);
+  --auxillary-bg: #1E2030;
 }
 
 body {
@@ -27,9 +27,6 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--color-night-900);
-  background-image:
-    linear-gradient(rgba(26, 27, 38, 0.8), rgba(26, 27, 38, 0.85)),
-    url("./background.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -42,7 +39,7 @@ body {
 
 main {
   flex: 1;
-  padding: 1rem 20%;
+  padding: 0% 20%;
   position: sticky;
   line-height: 1.5;
 }
@@ -50,11 +47,11 @@ main {
 header {
   font-family: "Lora", serif;
   background: var(--auxillary-bg);
-  position: fixed;
   color: var(--color-slate-200);
   padding: 1rem 20%;
-  position: sticky;
   z-index: 1000;
+
+  position: sticky;
 }
 
 header nav {
@@ -73,6 +70,8 @@ header nav {
 
 .flex-wrapper > aside {
   order: 1 !important;
+  padding-top: 1rem;
+  margin-bottom: -1rem;
 }
 
 details {
@@ -216,19 +215,17 @@ header nav ul li {
 }
 
 @media (max-width: 768px) {
-  :root {
-    --auxillary-bg: #1E2030;
-  }
-  body {
-    background-image: none;
-  }
   header,
   footer,
   main {
-    padding: 1rem 1rem;
+    padding: 0rem 1rem;
     overflow-wrap: anywhere;
     word-break: break-word; /* fallback/help for some engines */
     hyphens: auto;          /* optional, nicer breaks for prose */
+  }
+
+  header,footer {
+    padding: 1rem 1rem;
   }
 
   math {

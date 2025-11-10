@@ -41,7 +41,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> TocIterator<'a, I> {
             table,
             levels: h,
             heading: HeadingT::Inactive,
-            slugger: Slugger::with_capacity(5),
+            slugger: Slugger::new(),
         }
     }
 }
