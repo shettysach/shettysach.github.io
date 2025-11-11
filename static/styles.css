@@ -71,7 +71,6 @@ header nav {
 .flex-wrapper > aside {
   order: 1 !important;
   padding-top: 1rem;
-  margin-bottom: -1rem;
 }
 
 details {
@@ -113,16 +112,19 @@ h1, h2, h3, h4, h5, h6 {
 
 pre {
   font-family: "JetBrains Mono", monospace;
+  font-size: 0.95rem;
   background: var(--auxillary-bg);
   padding: 0.75rem 0.75rem;
   box-sizing: border-box;
   overflow-x: auto;
   white-space: pre;
-  border: 1px solid var(--color-slate-800);
+  border: 0.75px solid var(--color-slate-800);
+  border-radius: 0px;
 }
 
 code {
   font-family: "JetBrains Mono", monospace;
+  font-size: 0.95rem;
 }
 
 p code,

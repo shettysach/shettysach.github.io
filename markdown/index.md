@@ -23,10 +23,9 @@ Here are some of my personal projects. For more detail read this [article](./02_
 - [Liquid-Oxygen](https://www.github.com/shettysach/Liquid-Oxygen) - Tree-walk interpreter for Lox written in Haskell
 - [This website](https://www.github.com/shettysach/shettysach.github.io) - This is my personal website, which uses [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [autumnus](https://crates.io/crates/autumnus) to generate static content from Markdown.
 
-## Contact
+## Links
 
-You can visit my [GitHub](https://www.github.com/shettysach) and contact me via
-
+- GitHub - [shettysach](https://www.github.com/shettysach)
 - Email - [shettysachith47@gmail.com](mailto:shettysachith47@gmail.com)
 - X/Twitter - [shettysach_](https://x.com/shettysach_)
 - LinkedIn - [/in/sachithshetty314](https://www.linkedin.com/in/sachithshetty314/)

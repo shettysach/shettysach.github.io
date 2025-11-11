@@ -3,10 +3,8 @@
 
 mod atom;
 mod generate;
-mod sitemap;
 mod syntex;
 mod toc;
-mod types;
 mod utils;
 
 use anyhow::Result;

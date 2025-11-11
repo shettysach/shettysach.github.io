@@ -1,12 +1,11 @@
 use crate::{
     syntex::{highlight_code, latex_to_mathml},
-    types::Levels,
-    utils::Slugger,
+    utils::{Levels, Slugger},
 };
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
 
-type HeadingCapture<'a> = (
+type HeadingType<'a> = (
     Vec<Event<'a>>,
     HeadingLevel,
     Option<CowStr<'a>>,
@@ -15,8 +14,8 @@ type HeadingCapture<'a> = (
 );
 
 #[derive(Default)]
-pub(crate) enum HeadingT<'a> {
-    Capturing(Box<HeadingCapture<'a>>),
+pub(crate) enum HeadingCapture<'a> {
+    Capturing(Box<HeadingType<'a>>),
     Emitting(Vec<Event<'a>>, HeadingLevel),
     #[default]
     Inactive,
@@ -25,10 +24,10 @@ pub(crate) enum HeadingT<'a> {
 pub(crate) struct TocIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
-    code_block: Option<(CowStr<'a>, String)>,
+    code: Option<CowStr<'a>>,
     table: &'a mut String,
-    heading: HeadingT<'a>,
-    slugger: Slugger,
+    heading: HeadingCapture<'a>,
+    slugger: Slugger<32>,
     levels: Levels,
 }
 
@@ -36,12 +35,12 @@ impl<'a, I: Iterator<Item = Event<'a>>> TocIterator<'a, I> {
     pub(crate) fn new(inner: I, levels: Levels, table: &'a mut String) -> Self {
         Self {
             inner,
-            storage: Storage::new(),
-            code_block: None,
-            table,
-            heading: HeadingT::Inactive,
-            slugger: Slugger::new(),
             levels,
+            table,
+            storage: Storage::new(),
+            code: None,
+            heading: HeadingCapture::Inactive,
+            slugger: Slugger::new(),
         }
     }
 }
@@ -50,9 +49,9 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let HeadingT::Emitting(ref mut h_events, level) = self.heading {
+        if let HeadingCapture::Emitting(ref mut h_events, level) = self.heading {
             return Some(h_events.pop().unwrap_or_else(|| {
-                self.heading = HeadingT::Inactive;
+                self.heading = HeadingCapture::Inactive;
                 Event::End(TagEnd::Heading(level))
             }));
         };
@@ -60,19 +59,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
         let event = self.inner.next()?;
 
         match event {
-            Event::Text(ref t) if let Some((_, s)) = self.code_block.as_mut() => {
-                s.push_str(t);
-                self.next()
-            }
-
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code_block = Some((lang, String::new()));
+                self.code = Some(lang);
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code_block.take() => {
-                let highlighted = highlight_code(&code, &lang).ok()?;
+            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                let highlighted = highlight_code(&code, lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
+            }
+
+            Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                self.code = None;
+                self.next()
             }
 
             Event::DisplayMath(latex) => {
@@ -91,7 +90,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 classes,
                 attrs,
             }) if self.levels.level_enabled(level) => {
-                self.heading = HeadingT::Capturing(Box::new((
+                self.heading = HeadingCapture::Capturing(Box::new((
                     Vec::with_capacity(1),
                     level,
                     id,
@@ -101,8 +100,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 self.next()
             }
 
-            Event::End(TagEnd::Heading(level_))
-                if let HeadingT::Capturing(box (mut h_events, level, id, classes, attrs)) =
+            Event::End(TagEnd::Heading(_level))
+                if let HeadingCapture::Capturing(box (mut h_events, level, id, classes, attrs)) =
                     std::mem::take(&mut self.heading) =>
             {
                 let header_text = h_events
@@ -123,7 +122,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
 
                 h_events.reverse();
 
-                self.heading = HeadingT::Emitting(h_events, level);
+                self.heading = HeadingCapture::Emitting(h_events, level);
 
                 Some(Event::Start(Tag::Heading {
                     level,
@@ -133,7 +132,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 }))
             }
 
-            _ if let HeadingT::Capturing(ref mut hbox) = self.heading => {
+            _ if let HeadingCapture::Capturing(ref mut hbox) = self.heading => {
                 hbox.0.push(event);
                 self.next()
             }

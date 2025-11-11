@@ -1,16 +1,22 @@
 use crate::{
-    atom::generate_atom_feed,
-    sitemap::generate_sitemap,
+    atom::{Entries, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
     toc::TocIterator,
-    types::{Entries, Frontmatter},
+    utils::Levels,
 };
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use pulldown_cmark::{Parser, html::write_html_io};
-use std::io::{BufWriter, Write};
-use std::{collections::HashMap, fs, path::Path, rc::Rc, time::SystemTime};
+use std::{
+    collections::HashMap,
+    fs,
+    io::{BufWriter, Write},
+    path::Path,
+    rc::Rc,
+    time::SystemTime,
+};
 use walkdir::WalkDir;
+use yaml_rust2::Yaml;
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
@@ -23,8 +29,9 @@ fn render_markdown(
 ) -> Result<Frontmatter> {
     let markdown = fs::read_to_string(src)?;
 
-    let (frontmatter, toc) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
-        .ok_or_else(|| Error::msg("Metadata error"))?;
+    let (frontmatter, levels) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
+        .and_then(Frontmatter::parse_metadata)
+        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
 
     if dst.exists() && dst.metadata()?.modified()? > modified {
         return Ok(frontmatter);
@@ -37,7 +44,7 @@ fn render_markdown(
 
     let parser = Parser::new_ext(&markdown, OPTIONS);
 
-    if let Some(levels) = toc {
+    if let Some(levels) = levels {
         let mut toc_string = String::new();
         let iter = TocIterator::new(parser, levels, &mut toc_string);
         writer.write_all(b"<div class=\"flex-wrapper\">")?;
@@ -94,7 +101,6 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
             let mut label = (*label_rc).clone();
 
             if let Some(tags) = frontmatter.tags {
-                label.push_str("<br>");
                 label.push_str(
                     &tags
                         .iter()
@@ -131,16 +137,16 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
 
-    // Extract metadata first
-    let (metadata, _) = process_metadata(Parser::new_ext(&index_md, OPTIONS))
-        .ok_or_else(|| Error::msg("Metadata error"))?;
+    let frontmatter = process_metadata(Parser::new_ext(&index_md, OPTIONS))
+        .and_then(Frontmatter::parse_metadata)
+        .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?
+        .0;
 
     let file = fs::File::create(html_dir.join("index.html"))?;
     let mut writer = BufWriter::new(file);
 
-    writer.write_all(metadata.header("").as_bytes())?;
+    writer.write_all(frontmatter.header("").as_bytes())?;
 
-    // Stream the processed events directly to HTML
     let parser = Parser::new_ext(&index_md, OPTIONS);
     let processed = CustomIterator::new(parser);
     write_html_io(&mut writer, processed)?;
@@ -148,16 +154,17 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    let (labels, atom_entries, tags_map) = collect_articles(markdown_dir, html_dir)?;
-    generate_articles_page(html_dir, labels)?;
+    let (article_labels, atom_entries, tags_map) = collect_articles(markdown_dir, html_dir)?;
+
+    generate_articles_page(article_labels, html_dir)?;
     generate_tags_page(tags_map, &html_dir.join("tags.html"))?;
     generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
-    generate_sitemap(&atom_entries, &html_dir.join("sitemap.xml"))?;
+    generate_sitemap(atom_entries, &html_dir.join("sitemap.xml"))?;
 
     Ok(())
 }
 
-pub(crate) fn generate_articles_page(html_dir: &Path, labels: Vec<String>) -> Result<()> {
+pub(crate) fn generate_articles_page(labels: Vec<String>, html_dir: &Path) -> Result<()> {
     let file = fs::File::create(html_dir.join("articles.html"))?;
     let mut writer = BufWriter::new(file);
 
@@ -215,6 +222,12 @@ fn generate_tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Pa
     Ok(())
 }
 
+pub(crate) struct Frontmatter {
+    pub(crate) title: String,
+    pub(crate) subtitle: Option<String>,
+    pub(crate) tags: Option<Vec<String>>,
+}
+
 impl Frontmatter {
     fn header(&self, url: &str) -> String {
         let description = self.subtitle.as_deref().unwrap_or("Blogpost");
@@ -236,8 +249,33 @@ impl Frontmatter {
 
         if let Some(subtitle) = &self.subtitle {
             label.push_str(subtitle);
+            label.push_str("<br>");
         }
 
         label
+    }
+
+    fn parse_metadata(doc: Yaml) -> Option<(Frontmatter, Option<Levels>)> {
+        let title = doc["title"].as_str()?.to_string();
+        let subtitle = doc["subtitle"].as_str().map(str::to_string);
+        let tags = doc["tags"]
+            .as_vec()
+            .and_then(|vec| vec.iter().map(|v| v.as_str().map(str::to_string)).collect());
+        let levels = doc["hmin"]
+            .as_i64()
+            .zip(doc["hmax"].as_i64())
+            .and_then(|(min, max)| {
+                let min: u8 = min.try_into().ok()?;
+                let max: u8 = max.try_into().ok()?;
+                Levels::new(min, max)
+            });
+        Some((
+            Frontmatter {
+                title,
+                subtitle,
+                tags,
+            },
+            levels,
+        ))
     }
 }

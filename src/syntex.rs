@@ -1,4 +1,3 @@
-use crate::types::{Frontmatter, Levels};
 use anyhow::Result;
 use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
 use pulldown_cmark::{
@@ -15,7 +14,7 @@ pub(crate) const OPTIONS: Options = Options::empty()
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
-    code_block: Option<(CowStr<'a>, String)>,
+    code: Option<CowStr<'a>>,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
@@ -23,7 +22,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
         Self {
             inner,
             storage: Storage::new(),
-            code_block: None,
+            code: None,
         }
     }
 }
@@ -35,19 +34,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
         let event = self.inner.next()?;
 
         match event {
-            Event::Text(ref t) if let Some((_, s)) = self.code_block.as_mut() => {
-                s.push_str(t);
-                self.next()
-            }
-
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code_block = Some((lang, String::new()));
+                self.code = Some(lang);
                 self.next()
             }
 
-            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code_block.take() => {
-                let highlighted = highlight_code(&code, &lang).ok()?;
+            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                let highlighted = highlight_code(&code, lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
+            }
+
+            Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                self.code = None;
+                self.next()
             }
 
             Event::DisplayMath(latex) => {
@@ -103,48 +102,13 @@ pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
     Ok(html)
 }
 
-pub(crate) fn process_metadata(mut parser: Parser) -> Option<(Frontmatter, Option<Levels>)> {
-    match parser.next() {
-        Some(Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
-        _ => return None,
+pub(crate) fn process_metadata(mut parser: Parser) -> Option<Yaml> {
+    if let Some(Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle))) = parser.next()
+        && let Some(Event::Text(yaml)) = parser.next()
+        && let Some(Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle))) = parser.next()
+    {
+        YamlLoader::load_from_str(&yaml).ok()?.into_iter().next()
+    } else {
+        None
     }
-
-    let yaml = match parser.next() {
-        Some(Event::Text(text)) => text,
-        _ => return None,
-    };
-
-    match parser.next() {
-        Some(Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle))) => {}
-        _ => return None,
-    }
-
-    parse_metadata(YamlLoader::load_from_str(&yaml).ok()?)
-}
-
-fn parse_metadata(docs: Vec<Yaml>) -> Option<(Frontmatter, Option<Levels>)> {
-    let doc = docs.first()?;
-    let title = doc["title"].as_str()?.to_string();
-    let subtitle = doc["subtitle"].as_str().map(str::to_string);
-    let tags = doc["tags"]
-        .as_vec()
-        .and_then(|vec| vec.iter().map(|v| v.as_str().map(str::to_string)).collect());
-
-    let levels = doc["hmin"]
-        .as_i64()
-        .zip(doc["hmax"].as_i64())
-        .and_then(|(min, max)| {
-            let min: u8 = min.try_into().ok()?;
-            let max: u8 = max.try_into().ok()?;
-            Levels::new(min, max)
-        });
-
-    Some((
-        Frontmatter {
-            title,
-            subtitle,
-            tags,
-        },
-        levels,
-    ))
 }
