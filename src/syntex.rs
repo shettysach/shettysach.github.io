@@ -87,9 +87,10 @@ pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
         .source(code)
         .lang(match syntax_tag {
-            "rust" => Language::Rust,
+            "rust" | "rs" => Language::Rust,
+            "python" | "py" => Language::Python,
+            "latex" | "tex" => Language::LaTeX,
             "html" => Language::HTML,
-            "latex" => Language::LaTeX,
             _ => Language::PlainText,
         })
         .pre_class(None)
