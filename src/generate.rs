@@ -1,8 +1,7 @@
 use crate::{
     atom::{Entries, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
-    toc::TocIterator,
-    utils::Levels,
+    toc::{Levels, TocIterator},
 };
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};

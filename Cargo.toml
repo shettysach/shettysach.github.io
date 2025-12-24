@@ -5,21 +5,22 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-xxhash-rust = { version = "0.8.15", features = ["xxh32"] }
-
 walkdir = "2.5.0"
 yaml-rust2 = "0.10.3"
-chrono = { version = "0.4", features = ["serde"] }
 quick-xml = "0.31"
-
 pulldown-latex = "0.7.1"
-autumnus = { version = "0.7.6", default-features = false, features = ["lang-rust", "lang-html", "lang-latex"] }
+pulldown-cmark = "0.13.0"
+fastbloom = "0.14.0"
 
-pulldown-cmark = "0.13.0" 
-# pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html", "simd"] }
+[dependencies.xxhash-rust]
+version = "0.8.15"
+features = [ "xxh32" ]
 
+[dependencies.chrono]
+version = "0.4"
+features = [ "serde" ]
 
-# [profile.release]
-# lto = true
-# codegen-units = 1
-# panic = "abort"
+[dependencies.autumnus]
+version = "0.7.6"
+default-features = false
+features = [ "lang-rust", "lang-python", "lang-html", "lang-latex" ]

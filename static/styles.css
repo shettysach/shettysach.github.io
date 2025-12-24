@@ -119,7 +119,6 @@ pre {
   overflow-x: auto;
   white-space: pre;
   border: 0.75px solid var(--color-slate-800);
-  border-radius: 0px;
 }
 
 code {
@@ -127,9 +126,9 @@ code {
   font-size: 0.95rem;
 }
 
-p code,
-span code {
+p code, span code, li code {
   display: inline;
+  color: var(--color-sky-400);
 }
 
 pre code {
@@ -140,12 +139,17 @@ pre code {
 math {
   overflow-x: auto;
   overflow-y: clip;
-  max-width: 100%;
+}
+
+math[display="inline"] {
+  font-weight: 600;
+  color: var(--color-sky-400);
 }
 
 math[display="block"] {
   font-size: 115%;
   margin: 1rem 1rem;
+  color: var(--color-slate-200);
 }
 
 blockquote {
@@ -175,8 +179,7 @@ li {
   padding-left: 0.5rem;
 }
 
-a,
-a * {
+a, a code, a * {
   color: var(--color-indigo-400);
   text-decoration: none;
 }
@@ -205,10 +208,6 @@ header nav ul {
 
 header nav ul li {
   display: inline;
-}
-
-.ascii {
-  color: var(--color-teal-300);
 }
 
 @media (max-width: 768px) {

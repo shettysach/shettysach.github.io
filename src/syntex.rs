@@ -31,9 +31,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let event = self.inner.next()?;
-
-        match event {
+        match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
                 self.next()
@@ -60,7 +58,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 Some(Event::InlineHtml(CowStr::from(mathml)))
             }
 
-            _ => Some(event),
+            event => Some(event),
         }
     }
 }

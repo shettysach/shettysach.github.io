@@ -32,13 +32,13 @@ These are some of my personal projects.
 
 [GitHub](https://github.com/shettysach/ferrograd)
 
-<pre class="ascii">
+```
    ___                               _
   |  _|___ ___ ___ ___ ___ ___ ___ _| |
   |  _| -_|  _|  _| . | . |  _| .'| . |
   |_| |___|_| |_| |___|_  |_| |__,|___|
                       |___|
-</pre>
+```
 
 - A small scalar autograd engine / Rust library, inspired by Karpathy's `micrograd`, with more features such as implementations of extra activation functions, optimizers, loss criterions, and accuracy metrics
 - Capable of MNIST classification with an example implemented using the library
@@ -94,14 +94,14 @@ These are some of my personal projects.
 
 [GitHub](https://github.com/shettysach/CandleMist)
 
-<pre class="ascii">
+```
                      (
                      )\
    ___              ((_)    __  __ _    _
   / __|__ _ _ _  __| | |___|  \/  (_)__| |_
  | (__/ _` | ' \/ _` | / -_) |\/| | (_-<  _|
   \___\__,_|_||_\__,_|_\___|_|  |_|_/__/\__|
-</pre>
+```
 
 - A fullstack chatbot built using Rust for both the frontend and the backend
 - Utilizes quantized Mistral 7B Instruct v0.1 GGUF models
@@ -126,13 +126,13 @@ These are some of my personal projects.
 
 [GitHub](https://github.com/shettysach/veNum)
 
-<pre class="ascii">
+```
                __
 __   _____  /\ \ \_   _ _ __ ___
 \ \ / / _ \/  \/ / | | | '_ ` _ \
  \ V /  __/ /\  /| |_| | | | | | |
   \_/ \___\_\ \/  \__,_|_| |_| |_|
-</pre>
+```
 
 - Stands for vectorized N-dimensional numerical arrays
 - Tensor/ ndarray library
@@ -191,12 +191,12 @@ __   _____  /\ \ \_   _ _ __ ___
 
 [GitHub](https://github.com/shettysach/Liquid-Oxygen)
 
-<pre class="ascii">
+```
 _    _ ____ _  _ _ ___     ____ _  _ _   _ ____ ____ _  _ 
 |    | |  | |  | | |  \ __ |  |  \/   \_/  | __ |___ |\ | 
 |___ | |_\| |__| | |__/    |__| _/\_   |   |__] |___ | \| 
                                                           
-</pre>
+```
 
 - Tree-walk interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html), based on the first half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
 

@@ -54,9 +54,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
             }));
         };
 
-        let event = self.inner.next()?;
-
-        match event {
+        match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
                 self.next()
@@ -125,12 +123,12 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
                 }))
             }
 
-            _ if let HeadingCapture::Capturing(ref mut hbox) = self.heading => {
-                hbox.0.push(event);
+            event if let HeadingCapture::Capturing(ref mut head) = self.heading => {
+                head.0.push(event);
                 self.next()
             }
 
-            _ => Some(event),
+            event => Some(event),
         }
     }
 }
@@ -146,7 +144,7 @@ pub(crate) fn table_bullet(
     format!("{indent}- [{heading}](#{anchor_id})\n")
 }
 
-// Headings
+// Heading levels
 
 use std::num::NonZeroU8;
 

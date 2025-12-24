@@ -45,7 +45,7 @@ MathML representation of the above equation:
 
 ### Pulldown-latex
 
-To convert from LaTeX to MathML, [`pulldown-cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math sections. When pulldown-cmark parses the markdown file, it detects the tags for both inline (`$`) and block (`$$`) math expressions. Then, the LaTeX inside these sections is converted to MathML using the [`pulldown-latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is streamed and the math is rendered. 
+To convert from LaTeX to MathML, [`pulldown-cmark`](https://crates.io/crates/pulldown-cmark) events are used to identify math sections. When the `pulldown_cmark::Parser` parses the markdown file, it detects the tags for both inline (`$`) and block (`$$`) math expressions. Then, the LaTeX inside these sections is converted to MathML using the [`pulldown-latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is streamed and the math is rendered.
 
 ---
 
@@ -65,14 +65,14 @@ fn sum_of_cubes_rhs(n: usize) -> usize {
 ### Autumnus and Tree-sitter
 
 For syntax highlighting, the blog uses the [`autumnus`](https://crates.io/crates/autumnus) crate,
-which uses [`tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood. 
-Tree-sitter powers the highlighting in editors such as 
+which uses [`tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood.
+Tree-sitter powers the highlighting in editors such as
 [Neovim](https://neovim.io/doc/user/treesitter.html) and [Zed](https://zed.dev/blog/syntax-aware-editing).
 
-When pulldown-cmark identifies a codeblock,
-autumnus generates HTML with CSS classes for different code elements
+When `pulldown-cmark` identifies a code block,
+autumnus generates HTML with different CSS classes for different code elements
 like keywords, variables and constants. This enables for syntax highlighting
-through CSS classes, which makes it easy to have colours assigned to different elements.
+through CSS. The `autumnus` repo provides several [CSS files](https://github.com/leandrocp/autumnus/tree/main/css), 
 
 Generated HTML with style classes for the above code:
 
@@ -92,19 +92,19 @@ Generated HTML with style classes for the above code:
 
 ## Relevant code
 
-Pulldown-cmark is a Markdown parser that returns an iterator of events rather than building a complete AST upfront. Events represent Markdown elements like
+The `pulldown_cmark::Parser` is a Markdown parser that returns an iterator of events rather than building a complete AST upfront. Events represent Markdown elements like
 
 - `Event::Start(Tag::CodeBlock(...))` - start of a code block
 - `Event::Text(...)` - text content
 - `Event::End(TagEnd::CodeBlock)` - end of a code block
 - `Event::DisplayMath(...)` - math sections
 
-The CustomIterator wraps this event stream and transforms events lazily during iteration.
+The `CustomIterator` wraps this event stream and transforms events lazily during iteration.
 
 ```rust
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,                 // Pulldown-cmark parser
-    storage: Storage,         // Used by pulldown-latex parser 
+    storage: Storage,         // Used by pulldown-latex parser
     code: Option<CowStr<'a>>, // Stores code block's language
 }
 
@@ -123,9 +123,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let event = self.inner.next()?;
-
-        match event {
+        match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
                 self.next()
@@ -152,7 +150,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 Some(Event::InlineHtml(CowStr::from(mathml)))
             }
 
-            _ => Some(event),
+            event => Some(event),
         }
     }
 }
