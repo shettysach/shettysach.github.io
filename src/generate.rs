@@ -95,8 +95,8 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 
             let frontmatter = render_markdown(src_path, &dst_html, modified, rel_url)?;
 
+            // Page will be rendered, but unlisted
             if frontmatter.draft {
-                // Page will be rendered, but will not affect tags and articles page
                 continue;
             }
 

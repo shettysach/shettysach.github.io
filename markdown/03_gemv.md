@@ -3,41 +3,37 @@ title: NVFP4 Batched GEMV
 subtitle: My submission for the first round of the GPUMODE Nvfp4 competition 
 tags: [ CuTe DSL ]
 draft: true
-<!-- hmin: 1 -->
-<!-- hmax: 6 -->
 ---
 
 # NVFP4 Batched GEMV
 
-Submission for the GPUMODE NVFP4 competition's first round.
+This article details my submission for the [GPUMODE nvfp4_gemv leaderboard](https://www.gpumode.com/v2/leaderboard/595?tab=rankings).
 
 ---
 
-## Problem description
+## Batched block-scaled GEMV  
 
-You will implement a batched matrix-vector multiplication kernel optimized for NVIDIA B200.
-To be explicit, you will be given a tuple of tensors:
-```
-(a, b, sfa, sfb, c)
-```
-where:
-* `a` is M x K x L in K-major order in nvfp4(e2m1)
-* `b` is 1 x K x L in K-major order in nvfp4(e2m1)
-* `sfa` is M x (K // 16) x L in K-major order in fp8(e4m3fnuz)
-* `sfb` is 1 x (K // 16) x L in K-major order in fp8(e4m3fnuz)
-* `c` is M x 1 x L in fp16
+You can find the problem description on the leaderboard page.
+The kernel computes a batched block‑scaled GEMV. 
 
-Matrix sizes `M` is divisible by mma_tiler_mn[0] defined in the kernel, `K` is divisible by 64.
-The ranking criteria is the geometric mean of the benchmark results.
-For the grand price, your kernel will be evaluated against the speed of light analysis
-and the solution closest to the speed of light will be awarded the grand price.
-```
-The speed of light analysis based on the max(FFMA math throughput, DRAM memory throughput) of B200 and tested under 1.5Ghz clock:
-M K L time[us]
-7168 16384 1 8.622
-4096 7168 8 17.275
-7168 2048 4 4.317
-```
+In mathematical notation,
+
+$$
+C[x,0,z] \;=\; \sum_{y=0}^{K-1} \Bigl(A[x,y,z]\;\mathrm{SFA}[x,y,z]\Bigr)\; \Bigl(B[y,0,z]\;\mathrm{SFB}[y,0,z]\Bigr)
+$$
+
+- $A$ and $SFA$ are matrices of shape $M \times K \times L$, and $B$ and $SFB$ are vectors of shape $K \times 1 \times L$
+- $M$ is the row dimension, $K$ is the column dimension and $L$ is the batch dimension
+- Each value is paired with a scale factor - 
+$A[x,y,z]$ is scaled by $\mathrm{SFA}[x,y,z]$, while $B[y,0,z]$ is scaled by $\mathrm{SFB}[y,0,z]$
+- For each output element $C[x, 0, z]$ (row $x$, column fixed to $0$ as $N=1$, batch $z$), it performs a dot product over the column dimension, with per‑block scale factors applied to both operands. 
+- C is of shape $M \times 1 \times L$ 
+
+In memory,
+
+- `a` and `b` are of fp4 dtype, while `sfa` and `sfb` are of fp8 dtype 
+- `a` and `sfa` are layed out as `(m, k, l)`, while `b` and `sfb` are layed out as `(128, k, l)`, padded for tiling requirements
+- `c` is of fp16 dtype and layed out as `(m, 1, l)`
 
 ---
 
@@ -74,18 +70,13 @@ def ceil_div(a, b):
 ### CuTe kernel
 
 `kernel` is the main kernel function that runs on the device (B200 GPU), decorated with `@cute.kernel`.
+It performs the batched block-scaled GEMV operation.
 
-At a high level, this kernel computes a block‑scaled GEMV. For each output element $C[m, 0, l]$ (row $m$, column fixed to $0$ as $N=1$, batch $l$), it performs a dot product over $K$, with per‑block scale factors applied to both operands -
-
-$$
-C[m,0,l] = \sum_k (A[m,k,l]\cdot \mathrm{SFA}[m,k,l])\cdot(B[0,k,l]\cdot \mathrm{SFB}[0,k,l])
-$$
-
-1. Each CTA handles a tile of the output: 128 rows x 1 column (`mma_tiler_mnk[:2]`) for one batch $l$.  
-2. Each thread (`tidx`) is responsible for 1 output element $C[m,0,l]$ within that tile.  
-3. CuTe’s `local_tile` creates matching tiled views of `A, B, SFA, SFB, C`, so the right chunks line up in memory.  
-4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`): load `FP4` and `FP8`, convert to `FP32`, then accumulate the scaled products.  
-5. After all $K$ tiles are processed, it casts `FP32 -> FP16` and stores the result to `C`.
+1. Each CTA handles a tile of the output `c`: 128 rows x 1 column (`mma_tiler_mnk[:2]`) for one batch $l$.  
+2. Each thread (`tidx`) is responsible for 1 output element `c[x,0,z]` within that tile.  
+3. CuTe’s `local_tile` creates matching tiled views of `a, b, sfa, sfb, c`, so the right chunks line up in memory.  
+4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`): load fp4 and fp8, convert to fp32, then accumulate the scaled products.  
+5. After all $K$ tiles are processed, it casts fp32 to fp16 and stores the result to `c`.
 
 
 ```py

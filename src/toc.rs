@@ -22,7 +22,7 @@ pub(crate) enum HeadingCapture<'a> {
 pub(crate) struct TocIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
-    code: Option<(CowStr<'a>, String)>,
+    code: Option<CowStr<'a>>,
     headings: Vec<(HeadingLevel, String, String)>,
     heading: HeadingCapture<'a>,
     slugger: Slugger<32>,
@@ -103,18 +103,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for &mut TocIterator<'a, I> {
 
         match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code = Some((lang, String::new()));
-                self.next()
+                self.code = Some(lang);
+                Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
             }
 
-            Event::Text(ref t) if let Some((_, s)) = self.code.as_mut() => {
-                s.push_str(t); // Need to capture for code blocks within bullets etc
-                self.next()
-            }
-
-            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code.take() => {
-                let highlighted = highlight_code(&code, &lang).ok()?;
+            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                let highlighted = highlight_code(&code, lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
+            }
+
+            event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                self.code = None;
+                Some(event)
             }
 
             Event::DisplayMath(latex) => {

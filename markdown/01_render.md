@@ -102,10 +102,15 @@ The `pulldown_cmark::Parser` is a Markdown parser that returns an iterator of ev
 The `CustomIterator` wraps this event stream and transforms events lazily during iteration.
 
 ```rust
+use pulldown_cmark::{
+    CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Parser, Tag, TagEnd,
+};
+use pulldown_latex::{Storage, config::DisplayMode};
+
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
-    inner: I,                           // Pulldown-cmark parser
-    storage: Storage,                   // Used by pulldown-latex parser
-    code: Option<(CowStr<'a>, String)>, // Stores code block's language and content
+    inner: I,
+    storage: Storage,
+    code: Option<CowStr<'a>>,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
@@ -124,18 +129,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code = Some((lang, String::new()));
-                self.next()
+                self.code = Some(lang);
+                Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
             }
 
-            Event::Text(ref t) if let Some((_, s)) = self.code.as_mut() => {
-                s.push_str(t); // Need to capture for code blocks for cases like within bullets etc.
-                self.next()    // Else could have just called to highlight here
-            }
-
-            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code.take() => {
-                let highlighted = highlight_code(&code, &lang).ok()?;
+            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                let highlighted = highlight_code(&code, lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
+            }
+
+            event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                self.code = None;
+                Some(event)
             }
 
             Event::DisplayMath(latex) => {
