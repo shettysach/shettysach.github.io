@@ -123,15 +123,16 @@ pre {
 
 code {
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.95rem;
 }
 
 p code, span code, li code {
   display: inline;
   color: var(--color-sky-400);
+  font-size: 0.95rem;
 }
 
 pre code {
+  color: var(--color-slate-200);
   white-space: pre;
   display: block;
 }

@@ -103,9 +103,9 @@ The `CustomIterator` wraps this event stream and transforms events lazily during
 
 ```rust
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
-    inner: I,                 // Pulldown-cmark parser
-    storage: Storage,         // Used by pulldown-latex parser
-    code: Option<CowStr<'a>>, // Stores code block's language
+    inner: I,                           // Pulldown-cmark parser
+    storage: Storage,                   // Used by pulldown-latex parser
+    code: Option<(CowStr<'a>, String)>, // Stores code block's language and content
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
@@ -115,7 +115,6 @@ impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
             storage: Storage::new(),
             code: None,
         }
-
     }
 }
 
@@ -125,18 +124,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code = Some(lang);
+                self.code = Some((lang, String::new()));
                 self.next()
             }
 
-            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                let highlighted = highlight_code(&code, lang).ok()?;
+            Event::Text(ref t) if let Some((_, s)) = self.code.as_mut() => {
+                s.push_str(t); // Need to capture for code blocks for cases like within bullets etc.
+                self.next()    // Else could have just called to highlight here
+            }
+
+            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code.take() => {
+                let highlighted = highlight_code(&code, &lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
-            }
-
-            Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
-                self.code = None;
-                self.next()
             }
 
             Event::DisplayMath(latex) => {
@@ -156,7 +155,10 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 }
 ```
 
+Math rendering with `pulldown_latex`
 ```rust
+use pulldown_latex::{RenderConfig, Storage, config::DisplayMode, mathml::push_mathml};
+
 pub(crate) fn latex_to_mathml(
     latex: &str,
     storage: &mut Storage,
@@ -176,7 +178,10 @@ pub(crate) fn latex_to_mathml(
 }
 ```
 
+Code highlighting with `autumnus`
 ```rust
+use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
+
 pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
         .source(code)

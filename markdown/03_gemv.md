@@ -1,12 +1,17 @@
 ---
-title: NVFP4 GEMV
+title: NVFP4 Batched GEMV
 subtitle: My submission for the first round of the GPUMODE Nvfp4 competition 
 tags: [ CuTe DSL ]
-hmin: 1
-hmax: 6
+draft: true
+<!-- hmin: 1 -->
+<!-- hmax: 6 -->
 ---
 
-# NVFP4 GEMV
+# NVFP4 Batched GEMV
+
+Submission for the GPUMODE NVFP4 competition's first round.
+
+---
 
 ## Problem description
 
@@ -34,9 +39,11 @@ M K L time[us]
 7168 2048 4 4.317
 ```
 
+---
+
 ## Reference kernel
 
-I iterated on the CuTe template kernel, `template_cute.py`, that can be found [here](https://github.com/gpu-mode/reference-kernels/blob/main/problems/nvidia/nvfp4_gemv/template_cute.py). Here is a breakdown of the file.
+I based my implementation on the CuTe template kernel, `template_cute.py`, that can be found [here](https://github.com/gpu-mode/reference-kernels/blob/main/problems/nvidia/nvfp4_gemv/template_cute.py). Here is a breakdown of the file.
 
 ### Setup
 
@@ -68,7 +75,7 @@ def ceil_div(a, b):
 
 `kernel` is the main kernel function that runs on the device (B200 GPU), decorated with `@cute.kernel`.
 
-At a high level, this kernel computes a block‑scaled GEMV. For each output element $C[m, 0, l]$ (row $m$, column fixed to $0$ as $N=1$, batch $l$), it performs a dot product over $K$, but with per‑block scale factors applied to both operands -
+At a high level, this kernel computes a block‑scaled GEMV. For each output element $C[m, 0, l]$ (row $m$, column fixed to $0$ as $N=1$, batch $l$), it performs a dot product over $K$, with per‑block scale factors applied to both operands -
 
 $$
 C[m,0,l] = \sum_k (A[m,k,l]\cdot \mathrm{SFA}[m,k,l])\cdot(B[0,k,l]\cdot \mathrm{SFB}[0,k,l])
@@ -275,3 +282,90 @@ def custom_kernel(data: input_t) -> output_t:
 
     return c
 ```
+
+---
+
+## Improvements
+
+### Parallelism over $K$
+
+The reference kernel implements
+
+- Parallelism over $M$ (output rows)
+  - At the block level, different blocks (`bidx`) each take a chunk of 128 rows to compute.
+  - Within each block, different threads (`tidx`) compute different rows within that 128-row chunk.
+
+- Parallelism over $L$ (batch dimension):
+  - At the block level, different blocks along `bidz` handle different batch indices $l$.
+  - Each block computes outputs for a single $l$, and many `bidz` blocks run in parallel.
+
+
+    ```py
+    # Inside `kernel`:
+    bidx, bidy, bidz = cute.arch.block_idx()   # bidx selects which 128-row chunk of M
+    tidx, _, _ = cute.arch.thread_idx()        # tidx selects the row within that chunk
+
+    ...
+    # Each thread picks exactly one output element C[m, 0, l]:
+    tCgC = gC_mnl[tidx, None, bidx, bidy, bidz]
+    ```
+
+- Launch parameters 
+
+    ```py
+    # Inside `my_kernel`:
+    kernel(...).launch(
+        grid=(
+            cute.ceil_div(c_tensor.shape[0], 128),  # how many 128-row blocks cover M
+            1,                                      # N is 1 (GEMV)
+            c_tensor.shape[2],                      # one block-slice per batch L
+        ),
+        block=[threads_per_cta, 1, 1],          # 128 threads per block
+        cluster=(1, 1, 1),
+    )
+    ```
+
+#### Changes
+
+- Parallelism over $K$ (the reduction dimension)
+    - In the reference kernel, one thread computes the full dot product over all $K$ elements for its output.
+    - In the new kernel, we split that work across multiple threads using `tidy`. Each thread handles a subset of the $K$ tiles in a strided loop:
+
+    ```python
+    # Inside `kernel`:
+    tidx, tidy, tidz = arch.thread_idx()
+    bidx, bidy, bidz = arch.block_idx()
+
+    ...
+
+    for k_block in range(tidy, k_tile_cnt, threads_k):
+    ```
+
+- Parallelism over $L$ inside a block (via `threads_l`)
+    - Instead of having one block handle only one batch index $l$, we let a block cover multiple $l$ values using `tidz`:
+
+    ```python
+    l_block = bidz * threads_l + tidz
+    ```
+
+- New launch parameters 
+    - Now threads handle each dimension. 
+    - Maximum threads per block = 1024. So $threads_k \times threads_m \times threads_l \leq 1024$.
+    - Max dimensions per block, $threads_m \leq 1024, threads_k \leq 1024, threads_l \leq 64$ 
+
+    ```py
+    # Inside `my_kernel`:
+    kernel(...).launch(
+        grid=(
+            ceil_div(size[0], threads_m),
+            1,
+            ceil_div(size[3], threads_l),  # to cover L batches, each block handles `threads_l` indices
+        ),
+        block=[threads_k, threads_m, threads_l],
+        cluster=(1, 1, 1),
+    )
+    ```
+
+### Reduction of partial sums (how we combine the $K$ work)
+
+After splitting $K$ across threads, we need to sum partial results. We can do this through shared memory or using warp shuffle reductions.

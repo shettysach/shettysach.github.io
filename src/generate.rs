@@ -44,17 +44,16 @@ fn render_markdown(
     let parser = Parser::new_ext(&markdown, OPTIONS);
 
     if let Some(levels) = levels {
-        let mut toc_string = String::new();
-        let iter = TocIterator::new(parser, levels, &mut toc_string);
+        let mut toc_iter = TocIterator::new(parser, levels);
         writer.write_all(b"<div class=\"flex-wrapper\">")?;
 
         writer.write_all(b"<div>")?;
-        write_html_io(&mut writer, iter)?;
+        write_html_io(&mut writer, &mut toc_iter)?;
         writer.write_all(b"</div>")?;
 
-        let table = Parser::new(&toc_string);
+        let toc_html = toc_iter.toc();
         writer.write_all(b"<aside><details><summary>Table of contents</summary>")?;
-        write_html_io(&mut writer, table)?;
+        writer.write_all(toc_html.as_bytes())?;
         writer.write_all(b"</details></aside>")?;
 
         writer.write_all(b"</div>")?;
@@ -95,6 +94,12 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
             let rel_url = rel_html.to_str().with_context(|| "Path not UTF8")?;
 
             let frontmatter = render_markdown(src_path, &dst_html, modified, rel_url)?;
+
+            if frontmatter.draft {
+                // Page will be rendered, but will not affect tags and articles page
+                continue;
+            }
+
             let label_rc = Rc::new(frontmatter.label(rel_url));
 
             let mut label = (*label_rc).clone();
@@ -225,6 +230,7 @@ pub(crate) struct Frontmatter {
     pub(crate) title: String,
     pub(crate) subtitle: Option<String>,
     pub(crate) tags: Option<Vec<String>>,
+    pub(crate) draft: bool,
 }
 
 impl Frontmatter {
@@ -268,11 +274,14 @@ impl Frontmatter {
                 let max: u8 = max.try_into().ok()?;
                 Levels::new(min, max)
             });
+        let draft = doc["draft"].as_bool().unwrap_or(false);
+
         Some((
             Frontmatter {
                 title,
                 subtitle,
                 tags,
+                draft,
             },
             levels,
         ))

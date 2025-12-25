@@ -22,28 +22,75 @@ pub(crate) enum HeadingCapture<'a> {
 pub(crate) struct TocIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
-    code: Option<CowStr<'a>>,
-    table: &'a mut String,
+    code: Option<(CowStr<'a>, String)>,
+    headings: Vec<(HeadingLevel, String, String)>,
     heading: HeadingCapture<'a>,
     slugger: Slugger<32>,
     levels: Levels,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> TocIterator<'a, I> {
-    pub(crate) fn new(inner: I, levels: Levels, table: &'a mut String) -> Self {
+    pub(crate) fn new(inner: I, levels: Levels) -> Self {
         Self {
             inner,
             levels,
-            table,
+            headings: Vec::new(),
             storage: Storage::new(),
             code: None,
             heading: HeadingCapture::Inactive,
             slugger: Slugger::new(),
         }
     }
+
+    pub(crate) fn toc(self) -> String {
+        if self.headings.is_empty() {
+            return String::new();
+        }
+
+        let est_size = self.headings.len() * 50;
+        let mut html = String::with_capacity(est_size);
+
+        html.push_str("<ul>");
+        let mut current_level = 1;
+
+        for (i, (level, text, id)) in self.headings.iter().enumerate() {
+            let level_num = Levels::level_to_u8(*level) as usize;
+
+            // Close previous item (except for first iteration)
+            if i > 0 {
+                html.push_str("</li>");
+            }
+
+            // Open nested lists if going deeper
+            if level_num > current_level {
+                for _ in current_level..level_num {
+                    html.push_str("<ul>");
+                }
+            }
+            // Close nested lists if going shallower
+            else if level_num < current_level {
+                for _ in level_num..current_level {
+                    html.push_str("</ul></li>");
+                }
+            }
+
+            current_level = level_num;
+
+            // Write the list item (kept separate for clarity, but could be combined)
+            html.push_str(&format!("<li><a href=\"#{}\">{}</a>", id, text));
+        }
+
+        // Close all remaining open lists
+        for _ in 1..current_level {
+            html.push_str("</ul></li>");
+        }
+        html.push_str("</li></ul>");
+
+        html
+    }
 }
 
-impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
+impl<'a, I: Iterator<Item = Event<'a>>> Iterator for &mut TocIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -56,18 +103,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
 
         match self.inner.next()? {
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code = Some(lang);
+                self.code = Some((lang, String::new()));
                 self.next()
             }
 
-            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                let highlighted = highlight_code(&code, lang).ok()?;
+            Event::Text(ref t) if let Some((_, s)) = self.code.as_mut() => {
+                s.push_str(t); // Need to capture for code blocks within bullets etc
+                self.next()
+            }
+
+            Event::End(TagEnd::CodeBlock) if let Some((lang, code)) = self.code.take() => {
+                let highlighted = highlight_code(&code, &lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
-            }
-
-            Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
-                self.code = None;
-                self.next()
             }
 
             Event::DisplayMath(latex) => {
@@ -108,8 +155,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
 
                 let id = id.unwrap_or_else(|| CowStr::from(self.slugger.slug(&header_text)));
 
-                self.table
-                    .push_str(&table_bullet(level, self.levels, &header_text, &id));
+                self.headings
+                    .push((level, header_text, id.as_ref().to_string()));
 
                 h_events.reverse();
 
@@ -131,17 +178,6 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for TocIterator<'a, I> {
             event => Some(event),
         }
     }
-}
-
-pub(crate) fn table_bullet(
-    level: HeadingLevel,
-    h: Levels,
-    heading: &str,
-    anchor_id: &str,
-) -> String {
-    let count = Levels::level_to_u8(level) - h.min_level();
-    let indent = "  ".repeat(count as usize);
-    format!("{indent}- [{heading}](#{anchor_id})\n")
 }
 
 // Heading levels
