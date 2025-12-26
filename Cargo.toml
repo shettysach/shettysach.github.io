@@ -23,4 +23,10 @@ features = [ "serde" ]
 [dependencies.autumnus]
 version = "0.7.6"
 default-features = false
-features = [ "lang-rust", "lang-python", "lang-html", "lang-latex" ]
+features = [
+  "lang-rust",
+  "lang-python",
+  "lang-html",
+  "lang-latex",
+  # "lang-diff",
+]

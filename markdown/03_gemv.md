@@ -14,7 +14,7 @@ This article details my submission for the [GPUMODE nvfp4_gemv leaderboard](http
 ## Batched block-scaled GEMV  
 
 You can find the problem description on the leaderboard page.
-The kernel computes a batched block‑scaled GEMV. 
+The kernel computes a batched block‑scaled General Matrix-Vector multiplication (GEMV). 
 
 In mathematical notation,
 
@@ -22,17 +22,26 @@ $$
 C[x,0,z] \;=\; \sum_{y=0}^{K-1} \Bigl(A[x,y,z]\;\mathrm{SFA}[x,y,z]\Bigr)\; \Bigl(B[y,0,z]\;\mathrm{SFB}[y,0,z]\Bigr)
 $$
 
-- $A$ and $SFA$ are matrices of shape $M \times K \times L$, and $B$ and $SFB$ are vectors of shape $K \times 1 \times L$
+- $A$ and $SFA$ are matrices of shape $M \times K \times L$, while $B$ and $SFB$ are vectors of shape $K \times 1 \times L$, and 
+$C$ is a vector of shape $M \times 1 \times L$ 
 - $M$ is the row dimension, $K$ is the column dimension and $L$ is the batch dimension
 - Each value is paired with a scale factor - 
 $A[x,y,z]$ is scaled by $\mathrm{SFA}[x,y,z]$, while $B[y,0,z]$ is scaled by $\mathrm{SFB}[y,0,z]$
 - For each output element $C[x, 0, z]$ (row $x$, column fixed to $0$ as $N=1$, batch $z$), it performs a dot product over the column dimension, with per‑block scale factors applied to both operands. 
-- C is of shape $M \times 1 \times L$ 
+
+## CuTe DSL
+
+<!-- TODO: -->
+>TODO: 
+>Write about Cute DSL. Move memory explanation here?
+
+[CuTe DSL](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl.html)
 
 In memory,
 
+- `a`, `b`, `sfa`, `sfb` and `c` are tensors
 - `a` and `b` are of fp4 dtype, while `sfa` and `sfb` are of fp8 dtype 
-- `a` and `sfa` are layed out as `(m, k, l)`, while `b` and `sfb` are layed out as `(128, k, l)`, padded for tiling requirements
+- `a` and `sfa` are layed out as `(m, k, l)`, while `b` and `sfb` are layed out as `(128, k, l)`, permuted and padded for easier tiling
 - `c` is of fp16 dtype and layed out as `(m, 1, l)`
 
 ---
@@ -72,11 +81,11 @@ def ceil_div(a, b):
 `kernel` is the main kernel function that runs on the device (B200 GPU), decorated with `@cute.kernel`.
 It performs the batched block-scaled GEMV operation.
 
-1. Each CTA handles a tile of the output `c`: 128 rows x 1 column (`mma_tiler_mnk[:2]`) for one batch $l$.  
-2. Each thread (`tidx`) is responsible for 1 output element `c[x,0,z]` within that tile.  
-3. CuTe’s `local_tile` creates matching tiled views of `a, b, sfa, sfb, c`, so the right chunks line up in memory.  
-4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`): load fp4 and fp8, convert to fp32, then accumulate the scaled products.  
-5. After all $K$ tiles are processed, it casts fp32 to fp16 and stores the result to `c`.
+1. Each CTA handles a tile of the output `c` - 128 rows x 1 column (`mma_tiler_mnk[:2]`) for one batch $l$
+2. Each thread (`tidx`) is responsible for 1 output element `c[x,0,z]` within that tile
+3. CuTe’s `local_tile` creates matching tiled views of `a, b, sfa, sfb, c`, so the right chunks line up in memory
+4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`): load fp4 and fp8, convert to fp32, then accumulate the scaled products
+5. After all $K$ tiles are processed, it casts fp32 to fp16 and stores the result to `c`
 
 
 ```py
@@ -282,81 +291,155 @@ def custom_kernel(data: input_t) -> output_t:
 
 The reference kernel implements
 
-- Parallelism over $M$ (output rows)
-  - At the block level, different blocks (`bidx`) each take a chunk of 128 rows to compute.
-  - Within each block, different threads (`tidx`) compute different rows within that 128-row chunk.
+#### Parallelism over $M$ (output rows)
+- At the block level, different blocks (`bidx`) each take a chunk of 128 rows to compute.
+- Within each block, different threads (`tidx`) compute different rows within that 128-row chunk.
 
-- Parallelism over $L$ (batch dimension):
-  - At the block level, different blocks along `bidz` handle different batch indices $l$.
-  - Each block computes outputs for a single $l$, and many `bidz` blocks run in parallel.
+####  Parallelism over $L$ (batch dimension):
+- At the block level, different blocks along `bidz` handle different batch indices $l$.
+- Each block computes outputs for a single $l$, and many `bidz` blocks run in parallel.
 
+```py
+# Inside `kernel`:
+bidx, bidy, bidz = cute.arch.block_idx()  # bidx selects which 128-row chunk of M, bidy is 0 (GEMV), bidz handles batch
+tidx, _, _ = cute.arch.thread_idx()       # tidx selects the row within that chunk
+
+...
+# Each thread picks exactly one output element C[m, 0, l]:
+tCgC = gC_mnl[tidx, None, bidx, bidy, bidz]
+
+...
+k_tile_cnt = gA_mkl.layout[3].shape
+for k_tile in range(k_tile_cnt):
+```
+
+Launch parameters 
+
+```py
+# Inside `my_kernel`:
+kernel(...).launch(
+    grid=(
+        cute.ceil_div(c_tensor.shape[0], 128),  # how many 128-row blocks cover M
+        1,                                      # N is 1 (GEMV)
+        c_tensor.shape[2],                      # one block-slice per batch L
+    ),
+    block=[threads_per_cta, 1, 1],              # 128 threads per block
+    cluster=(1, 1, 1),
+)
+```
+
+Changes applied to the kernel 
+
+#### Parallelism over $K$ (the reduction dimension)
+- In the reference kernel, one thread computes the full dot product over all $K$ elements for its output.
+- In the new kernel, we split that work across multiple threads using `tidy`. Each thread handles a subset of the $K$ tiles in a strided loop:
+
+#### Parallelism over $L$ inside a block (via `threads_l`)
+- Instead of having one block handle only one batch index $l$, we let a block cover multiple $l$ values using `tidz`:
+
+```python
+# Inside `kernel`:
+bidx, bidy, bidz = arch.block_idx()
+tidx, tidy, tidz = arch.thread_idx()
+
+l_block = bidz * threads_l + tidz
+
+...
+tCgC = gC_mnl[tidx, None, bidx, bidy, l_block]
+
+...
+for k_block in range(tidy, k_tile_cnt, threads_k):
+```
+
+New launch parameters 
+- Now threads handle each dimension. They need to adhere to these limits. 
+- Maximum threads per block = 1024. So $threads_k \times threads_m \times threads_l \leq 1024$.
+- Max dimensions per block, $threads_m \leq 1024, threads_k \leq 1024, threads_l \leq 64$ 
+
+```py
+# Inside `my_kernel`:
+kernel(...).launch(
+    grid=(
+           ceil_div(size[0], threads_m),
+           1,
+           ceil_div(size[3], threads_l),  # to cover L batches, each block handles `threads_l` indices
+       ),
+       block=[threads_k, threads_m, threads_l],
+       cluster=(1, 1, 1),
+   )
+   ```
+
+### Reduction of partial sums (combining the $K$ work)
+
+Once we split the $K$ loop across `threads_k` threads (via `tidy`), each thread computes a **partial sum** for the same output element. We then need to reduce across `tidy`to get the final dot product for that output. There are two ways we do this.
+
+#### I. Shared-memory reduction
+
+Shared memory (SMEM) is a small, fast memory that is shared by all threads in the same block (CTA).  
+Threads can write their partial results to SMEM, synchronize with `__syncthreads()` in CUDA / `arch.sync_threads()` in CuTe DSL, 
+and then have one or more threads read from SMEM to sum everything up.  
+
+1. Each thread writes its partial sum to a shared-memory buffer indexed by `(tidx, tidy, tidz)`
 
     ```py
-    # Inside `kernel`:
-    bidx, bidy, bidz = cute.arch.block_idx()   # bidx selects which 128-row chunk of M
-    tidx, _, _ = cute.arch.thread_idx()        # tidx selects the row within that chunk
-
+    allocator = cutlass.utils.SmemAllocator()
+    layout = cute.make_layout((threads_m, threads_k + 1, threads_l))
+    res = allocator.allocate_tensor(Float16, layout)
     ...
-    # Each thread picks exactly one output element C[m, 0, l]:
-    tCgC = gC_mnl[tidx, None, bidx, bidy, bidz]
-    ```
-
-- Launch parameters 
-
-    ```py
-    # Inside `my_kernel`:
-    kernel(...).launch(
-        grid=(
-            cute.ceil_div(c_tensor.shape[0], 128),  # how many 128-row blocks cover M
-            1,                                      # N is 1 (GEMV)
-            c_tensor.shape[2],                      # one block-slice per batch L
-        ),
-        block=[threads_per_cta, 1, 1],          # 128 threads per block
-        cluster=(1, 1, 1),
-    )
-    ```
-
-#### Changes
-
-- Parallelism over $K$ (the reduction dimension)
-    - In the reference kernel, one thread computes the full dot product over all $K$ elements for its output.
-    - In the new kernel, we split that work across multiple threads using `tidy`. Each thread handles a subset of the $K$ tiles in a strided loop:
-
-    ```python
-    # Inside `kernel`:
-    tidx, tidy, tidz = arch.thread_idx()
-    bidx, bidy, bidz = arch.block_idx()
-
-    ...
-
     for k_block in range(tidy, k_tile_cnt, threads_k):
+        ...
+        for i in cutlass.range_constexpr(0, k_tile):
+          res[tidx, tidy, tidz] = tABrAB[i] * tSFrSF[i]
     ```
 
-- Parallelism over $L$ inside a block (via `threads_l`)
-    - Instead of having one block handle only one batch index $l$, we let a block cover multiple $l$ values using `tidz`:
-
-    ```python
-    l_block = bidz * threads_l + tidz
-    ```
-
-- New launch parameters 
-    - Now threads handle each dimension. 
-    - Maximum threads per block = 1024. So $threads_k \times threads_m \times threads_l \leq 1024$.
-    - Max dimensions per block, $threads_m \leq 1024, threads_k \leq 1024, threads_l \leq 64$ 
+1. Block sync is used to make sure all partials are visible
 
     ```py
-    # Inside `my_kernel`:
-    kernel(...).launch(
-        grid=(
-            ceil_div(size[0], threads_m),
-            1,
-            ceil_div(size[3], threads_l),  # to cover L batches, each block handles `threads_l` indices
-        ),
-        block=[threads_k, threads_m, threads_l],
-        cluster=(1, 1, 1),
-    )
+    arch.sync_threads()
     ```
 
-### Reduction of partial sums (how we combine the $K$ work)
+2. Then a single thread per output (here `tidy == 0`) loops over `tidy` and adds them up, and stores the result
 
-After splitting $K$ across threads, we need to sum partial results. We can do this through shared memory or using warp shuffle reductions.
+    ```py
+    if tidy == 0:
+        out = cute.zeros_like(tCgC, Float32)
+        for i in cutlass.range_constexpr(threads_k):
+            out += res[tidx, i, tidz]
+        tCgC.store(out.to(c_dtype))
+    ```
+
+#### II. Warp shuffle reduction 
+
+On NVIDIA GPUs, a warp is a group of 32 threads that run together. 
+These 32 threads execute the same instructions in lockstep. 
+We can use warp operations like shuffle to let those 32 threads share values quickly without SMEM for the reduction.
+
+1. Each thread keeps its partial sum in a register
+
+    ```python
+    res = Float32(0)
+    ...
+    for k_block in range(tidy, k_tile_cnt, threads_k):
+        ...
+        for i in cutlass.range_constexpr(0, k_tile):
+          res = tABrAB[i] * tSFrSF[i]
+    ```
+
+1. Warp shuffle butterfly ops are used to sum values across the `tidy` dimension
+
+    ```python
+    offset = threads_k >> 1
+    while offset > 0:
+        res += arch.shuffle_sync_bfly(res, offset, threads_k)
+        offset >>= 1
+    ```
+
+1. After the shuffle reduction, lane 0 (`tidy == 0`) has the total and writes it out
+
+    ```python
+    if tidy == 0:
+        out = scalar_to_ssa(res, acc_dtype)
+        tCgC.store(out.to(c_dtype))
+    ```
+
+This avoids shared memory and avoids `sync_threads`, so it’s usually faster as long as the participating threads are in one warp.

@@ -89,6 +89,7 @@ pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
             "py" | "python" => Language::Python,
             "tex" | "latex" => Language::LaTeX,
             "html" => Language::HTML,
+            // "git" => Language::Diff,
             _ => Language::PlainText,
         })
         .pre_class(None)
