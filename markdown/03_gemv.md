@@ -5,46 +5,70 @@ tags: [ CuTe DSL ]
 draft: true
 ---
 
+<!-- TODO:  -->
+<!-- - Explain why fp32 accum -->
+<!-- - be more CuTe focused, CuTe terms -->
+
 # NVFP4 Batched GEMV
 
-This article details my submission for the [GPUMODE nvfp4_gemv leaderboard](https://www.gpumode.com/v2/leaderboard/595?tab=rankings).
+This article details my submission for the [GPUMODE nvfp4_gemv leaderboard](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
+and the various techniques I used to iterate over the reference kernel to make it faster, but also what it lacked.
+A big credit goes to [Simon's blog](https://veitner.bearblog.dev/blog/).
 
 ---
 
-## Batched block-scaled GEMV  
+## The problem to be optimized
 
 You can find the problem description on the leaderboard page.
-The kernel computes a batched block‑scaled General Matrix-Vector multiplication (GEMV). 
+The kernel computes a batched block‑scaled GEMV. 
 
-In mathematical notation,
+### GEMV
+
+$$
+C[x, 0] = \sum_{y=0}^{K-1} A[x,y]\;B[y, 0]
+$$
+
+- GEMV stands for **GE**neral **M**atrix–**V**ector multiplication
+- $x$ is the index for the row dimension and $y$ is the index for the column dimension
+- We multiply a matrix $A$ of shape $M \times L$ by a vector $B$ of shape $K \times 1$ to produce another vector $C$ of shape $M \times 1$
+
+### Batched GEMV
+
+$$
+C[x,0,z] = \sum_{y=0}^{K-1} A[x,y,z]\;B[y,0,z]
+$$
+
+- In batched GEMV, we do $L$ independent GEMV computations, where $L$ is the number of the batches 
+- $z$ is the index for the batch dimension. For each fixed $z$, we perform an independent GEMV.
+- $A$ is a matrix of shape $M \times K \times L$, while $B$ is a vector of shape $K \times 1 \times L$, and 
+$C$ is a vector of shape $M \times 1 \times L$ 
+
+### Batched block-scaled GEMV
 
 $$
 C[x,0,z] \;=\; \sum_{y=0}^{K-1} \Bigl(A[x,y,z]\;\mathrm{SFA}[x,y,z]\Bigr)\; \Bigl(B[y,0,z]\;\mathrm{SFB}[y,0,z]\Bigr)
 $$
 
+- In batched block-scaled GEMV, each value is paired with a scale factor - 
+$A[x,y,z]$ is scaled by $\mathrm{SFA}[x,y,z]$, while $B[y,0,z]$ is scaled by $\mathrm{SFB}[y,0,z]$
 - $A$ and $SFA$ are matrices of shape $M \times K \times L$, while $B$ and $SFB$ are vectors of shape $K \times 1 \times L$, and 
 $C$ is a vector of shape $M \times 1 \times L$ 
-- $M$ is the row dimension, $K$ is the column dimension and $L$ is the batch dimension
-- Each value is paired with a scale factor - 
-$A[x,y,z]$ is scaled by $\mathrm{SFA}[x,y,z]$, while $B[y,0,z]$ is scaled by $\mathrm{SFB}[y,0,z]$
-- For each output element $C[x, 0, z]$ (row $x$, column fixed to $0$ as $N=1$, batch $z$), it performs a dot product over the column dimension, with per‑block scale factors applied to both operands. 
 
-## CuTe DSL
-
-<!-- TODO: -->
->TODO: 
->Write about Cute DSL. Move memory explanation here?
-
-[CuTe DSL](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl.html)
-
-In memory,
-
-- `a`, `b`, `sfa`, `sfb` and `c` are tensors
+This is the mathematical explanation of the problem. In memory,
+- `a`, `b`, `sfa`, `sfb` and `c` are Torch tensors, later casted to CuTe tensors
 - `a` and `b` are of fp4 dtype, while `sfa` and `sfb` are of fp8 dtype 
 - `a` and `sfa` are layed out as `(m, k, l)`, while `b` and `sfb` are layed out as `(128, k, l)`, permuted and padded for easier tiling
 - `c` is of fp16 dtype and layed out as `(m, 1, l)`
 
 ---
+
+## CuTe DSL
+
+[CuTe DSL](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl.html) 
+for Python is a high‑level, Python front end over NVIDIA’s CUTLASS/CuTe tensor core infrastructure 
+that lets you describe GPU kernels in terms of tiled tensors, layouts, and copy/compute primitives, and also low-level optimizations when needed. 
+The tiling abstraction seems to be the direction kernel frameworks are headed, and since there was a template file using the DSL, 
+I chose to use CuTe for the problem.
 
 ## Reference kernel
 
@@ -284,10 +308,78 @@ def custom_kernel(data: input_t) -> output_t:
 ```
 
 ---
+---
 
-## Improvements
+## Optimizations
 
-### Parallelism over $K$
+---
+
+### Restructuring the multiplication and accumulation
+
+In the reference kernel, each iteration does this
+- Load FP4/FP8 values from global memory.
+- Convert them to FP32.
+- Store the converted vectors into separate (RMEM) tensors (`tArA`, `tBrB`, `tArSFA`, `tBrSFB`) 
+- Inside the inner loop, repeatedly loads from those RMEM tensors to multiply 4 values and accumulate
+
+```py
+# Load NVFP4 or FP8 values from global memory
+a_val_nvfp4 = tAgA.load()
+b_val_nvfp4 = tBgB.load()
+sfa_val_fp8 = tAgSFA.load()
+sfb_val_fp8 = tBgSFB.load()
+
+# Convert loaded values to float32 for computation (FFMA)
+a_val = a_val_nvfp4.to(cutlass.Float32)
+b_val = b_val_nvfp4.to(cutlass.Float32)
+sfa_val = sfa_val_fp8.to(cutlass.Float32)
+sfb_val = sfb_val_fp8.to(cutlass.Float32)
+
+# Store the converted values to RMEM CuTe tensors
+tArA.store(a_val)
+tBrB.store(b_val)
+tArSFA.store(sfa_val)
+tBrSFB.store(sfb_val)
+
+# Iterate over SF vector tiles and compute the scale&matmul accumulation
+for i in cutlass.range_constexpr(mma_tiler_mnk[2]):
+    res += tArA[i] * tArSFA[i] * tBrB[i] * tBrSFB[i]
+```
+
+In the new version, we keep the same load and convert step, but instead of creating 4 RMEM tensors and storing into them, we
+- Compute the two products, one with the data and another with the scale factors 
+	- `tABrAB = a_vec * b_vec` 
+	- `tSFrSF = sfa_vec * sfb_vec` 
+- Then the inner loop becomes a multiply-accumulate
+
+This provides a small speedup and makes it easier for later optimizations.
+
+```py
+# Load NVFP4 or FP8 values from global memory
+a_val_nvfp4 = tAgA.load()
+b_val_nvfp4 = tBgB.load()
+sfa_val_fp8 = tAgSFA.load()
+sfb_val_fp8 = tBgSFB.load()
+
+# Convert loaded values to float32 for computation (FFMA)
+a_vec = a_val_nvfp4.to(cutlass.Float32)
+b_vec = b_val_nvfp4.to(cutlass.Float32)
+sfa_vec = sfa_val_fp8.to(cutlass.Float32)
+sfb_vec = sfb_val_fp8.to(cutlass.Float32)
+
+# multiplication happens in RMEM 
+tABrAB = a_vec * b_vec
+tSFrSF = sfa_vec * sfb_vec
+
+# Iterate over SF vector tiles and compute the scale&matmul accumulation
+for i in cutlass.range_constexpr(mma_tiler_mnk[2]):
+    res += tABrAB[i] * tSFrSF[i]
+```
+
+---
+
+
+### Parallelism over dimensions
 
 The reference kernel implements
 
@@ -313,7 +405,7 @@ k_tile_cnt = gA_mkl.layout[3].shape
 for k_tile in range(k_tile_cnt):
 ```
 
-Launch parameters 
+The reference kernel then uses these launch parameters 
 
 ```py
 # Inside `my_kernel`:
@@ -328,7 +420,7 @@ kernel(...).launch(
 )
 ```
 
-Changes applied to the kernel 
+Based on [Simon's blogpost](https://veitner.bearblog.dev/nvfp4-gemv-improved/), I made these improvements over the kernel.
 
 #### Parallelism over $K$ (the reduction dimension)
 - In the reference kernel, one thread computes the full dot product over all $K$ elements for its output.
@@ -351,8 +443,7 @@ tCgC = gC_mnl[tidx, None, bidx, bidy, l_block]
 for k_block in range(tidy, k_tile_cnt, threads_k):
 ```
 
-New launch parameters 
-- Now threads handle each dimension. They need to adhere to these limits. 
+New launch parameters. Now threads handle each dimension. They need to adhere to these limits - 
 - Maximum threads per block = 1024. So $threads_k \times threads_m \times threads_l \leq 1024$.
 - Max dimensions per block, $threads_m \leq 1024, threads_k \leq 1024, threads_l \leq 64$ 
 
@@ -368,37 +459,41 @@ kernel(...).launch(
        cluster=(1, 1, 1),
    )
    ```
+---
 
 ### Reduction of partial sums (combining the $K$ work)
 
-Once we split the $K$ loop across `threads_k` threads (via `tidy`), each thread computes a **partial sum** for the same output element. We then need to reduce across `tidy`to get the final dot product for that output. There are two ways we do this.
+Once we split the $K$ loop across `threads_k` threads (via `tidy`), each thread computes a partial sum for the same output element. We then need to reduce across `tidy`to get the final dot product for that output. There are two ways we do this.
 
-#### I. Shared-memory reduction
+#### SMEM reduction
 
 Shared memory (SMEM) is a small, fast memory that is shared by all threads in the same block (CTA).  
 Threads can write their partial results to SMEM, synchronize with `__syncthreads()` in CUDA / `arch.sync_threads()` in CuTe DSL, 
 and then have one or more threads read from SMEM to sum everything up.  
 
-1. Each thread writes its partial sum to a shared-memory buffer indexed by `(tidx, tidy, tidz)`
+- Each thread writes its partial sum to a shared-memory buffer indexed by `(tidx, tidy, tidz)`
 
     ```py
     allocator = cutlass.utils.SmemAllocator()
-    layout = cute.make_layout((threads_m, threads_k + 1, threads_l))
+    layout = cute.make_layout((threads_m, threads_k, threads_l))
     res = allocator.allocate_tensor(Float16, layout)
+    r = Float32(0)
+
     ...
     for k_block in range(tidy, k_tile_cnt, threads_k):
         ...
         for i in cutlass.range_constexpr(0, k_tile):
-          res[tidx, tidy, tidz] = tABrAB[i] * tSFrSF[i]
+          r += tABrAB[i] * tSFrSF[i]
     ```
 
-1. Block sync is used to make sure all partials are visible
+- Block sync is used to make sure all partials are visible
 
     ```py
     arch.sync_threads()
+    res[tidx, tidy, tidz] = r
     ```
 
-2. Then a single thread per output (here `tidy == 0`) loops over `tidy` and adds them up, and stores the result
+- Then a single thread per output (`tidy == 0`) loops over `tidy` and adds them up, and stores the result
 
     ```py
     if tidy == 0:
@@ -408,33 +503,33 @@ and then have one or more threads read from SMEM to sum everything up.
         tCgC.store(out.to(c_dtype))
     ```
 
-#### II. Warp shuffle reduction 
+#### Warp shuffle reduction 
 
 On NVIDIA GPUs, a warp is a group of 32 threads that run together. 
 These 32 threads execute the same instructions in lockstep. 
 We can use warp operations like shuffle to let those 32 threads share values quickly without SMEM for the reduction.
 
-1. Each thread keeps its partial sum in a register
+- Each thread keeps its partial sum in a register
 
     ```python
     res = Float32(0)
     ...
     for k_block in range(tidy, k_tile_cnt, threads_k):
         ...
-        for i in cutlass.range_constexpr(0, k_tile):
+        for i in cutlass.range_constexpr(0, 128):
           res = tABrAB[i] * tSFrSF[i]
     ```
 
-1. Warp shuffle butterfly ops are used to sum values across the `tidy` dimension
+- Warp shuffle butterfly ops are used to sum values across the `tidy` dimension
 
     ```python
     offset = threads_k >> 1
     while offset > 0:
         res += arch.shuffle_sync_bfly(res, offset, threads_k)
-        offset >>= 1
+        offset >>= 1 # right shift assign, not monadic bind 
     ```
 
-1. After the shuffle reduction, lane 0 (`tidy == 0`) has the total and writes it out
+- After the shuffle reduction, lane 0 (`tidy == 0`) has the total and writes it out
 
     ```python
     if tidy == 0:
@@ -442,4 +537,195 @@ We can use warp operations like shuffle to let those 32 threads share values qui
         tCgC.store(out.to(c_dtype))
     ```
 
+    where `scalar_to_ssa` is this helper, taken from the [FlashAttention repo](https://github.com/Dao-AILab/flash-attention/blob/58fe37fba6b07ac0aa6e88a94d68f8378c901028/flash_attn/cute/utils.py#L843)
+
+    ```python
+    @cute.jit
+    def scalar_to_ssa(a: cute.Numeric, dtype) -> cute.TensorSSA:
+        vec = cute.make_rmem_tensor(1, dtype)
+        vec[0] = a
+        return vec.load()
+    ```
+
 This avoids shared memory and avoids `sync_threads`, so it’s usually faster as long as the participating threads are in one warp.
+
+The first shape `(7168, 16384, 1)` was faster with the SMEM reduction while the other 2 were faster with the warp shuffle reduction.
+
+---
+
+### Using FP16 Fused-Multiply-Accumulate
+
+This is based entirely on [Simon's blogpost](https://veitner.bearblog.dev/demystifying-numeric-conversions-in-cutedsl/).
+The B200 has 32-bit registers. As of yet we have been performing 1 fp16 calculation on these registers at a time.
+However, we can actually perform 2 fp16 calculations instead, using it's full 32-bit capacity.
+
+We can convert NVFP4 vectors `a_vec` and `b_vec` to fp16 using the `.to(Float16)` method in the TensorSSA class. 
+However, to convert FP8 vectors `sfa_vec` and `sfb_vec`, I had to use these low-level PTX instructions from [Simon's blogpost](https://veitner.bearblog.dev/demystifying-numeric-conversions-in-cutedsl/), which goes into more details. 
+Since I always use it on vectors of length 128 , I could simplify it and only use the part for vectors perfectly divisible by 8.    
+
+```python
+@dsl_user_op
+def cvt_f8e4m3_f16_intr(vec_f8e4m3, length, *, loc=None, ip=None):
+    src_pos = 0
+    vec_src_i8 = builtin.unrealized_conversion_cast(
+        [ir.VectorType.get([length], Int8.mlir_type, loc=loc)],
+        [vec_f8e4m3],
+        loc=loc,
+        ip=ip,
+    )
+    vec_i8x8_type = ir.VectorType.get([8], Int8.mlir_type, loc=loc)
+    vec_dst_type = ir.VectorType.get([length], Float16.mlir_type, loc=loc)
+    vec_dst = llvm.mlir_zero(vec_dst_type, loc=loc, ip=ip)
+
+    num_vec8 = length // 8
+    for _ in range(num_vec8):
+        vec_f8e4m3x8 = vector.extract_strided_slice(
+            vec_i8x8_type, vec_src_i8, [src_pos], [8], [1], loc=loc, ip=ip
+        )
+        vec_f16x8 = cvt_f8e4m3x8_to_f16x8(vec_f8e4m3x8, loc=loc, ip=ip)
+        vec_dst = vector.insert_strided_slice(vec_f16x8, vec_dst, [src_pos], [1], loc=loc, ip=ip)
+        src_pos += 8
+        length -= 8
+
+    return vec_dst
+
+# Convert 8 float8e4m3 values to 8 float16 values
+@dsl_user_op
+def cvt_f8e4m3x8_to_f16x8(src_vec8, *, loc=None, ip=None):
+    # Split into two i32 values instead of using i64
+    vec_i32x2_type = ir.VectorType.get([2], Int32.mlir_type, loc=loc)
+    src_i32x2 = llvm.bitcast(vec_i32x2_type, src_vec8, loc=loc, ip=ip)
+    src_lo = llvm.extractelement(src_i32x2, arith.constant(Int32.mlir_type, 0), loc=loc, ip=ip)
+    src_hi = llvm.extractelement(src_i32x2, arith.constant(Int32.mlir_type, 1), loc=loc, ip=ip)
+
+    # Process lower 4 bytes (4 fp8 values)
+    rst_lo_i32x2 = llvm.inline_asm(
+        llvm.StructType.get_literal([T.i32(), T.i32()]),
+        [src_lo],
+        """{\n\t
+            .reg .b16 h0, h1;\n\t
+            mov.b32 {h0, h1}, $2;\n\t
+            cvt.rn.f16x2.e4m3x2 $0, h0;\n\t
+            cvt.rn.f16x2.e4m3x2 $1, h1;\n\t
+        }""",
+        "=r,=r,r",
+    )
+
+    # Process upper 4 bytes (4 fp8 values)
+    rst_hi_i32x2 = llvm.inline_asm(
+        llvm.StructType.get_literal([T.i32(), T.i32()]),
+        [src_hi],
+        """{\n\t
+            .reg .b16 h0, h1;\n\t
+            mov.b32 {h0, h1}, $2;\n\t
+            cvt.rn.f16x2.e4m3x2 $0, h0;\n\t
+            cvt.rn.f16x2.e4m3x2 $1, h1;\n\t
+        }""",
+        "=r,=r,r",
+    )
+
+    res0 = llvm.extractvalue(T.i32(), rst_lo_i32x2, [0])
+    res1 = llvm.extractvalue(T.i32(), rst_lo_i32x2, [1])
+    res2 = llvm.extractvalue(T.i32(), rst_hi_i32x2, [0])
+    res3 = llvm.extractvalue(T.i32(), rst_hi_i32x2, [1])
+
+    vec_i32x4_type = ir.VectorType.get([4], Int32.mlir_type, loc=loc)
+    vec_i32x4 = vector.from_elements(vec_i32x4_type, [res0, res1, res2, res3], loc=loc, ip=ip)
+    vec_f16x8_type = ir.VectorType.get([8], Float16.mlir_type, loc=loc)
+    vec_f16x8 = llvm.bitcast(vec_f16x8_type, vec_i32x4, loc=loc, ip=ip)
+    return vec_f16x8
+```
+
+Converting the RMEM vectors to Float16.
+
+```python
+a_vec = tAgA.load().to(Float16)
+b_vec = tBgB.load().to(Float16)
+sfa_vec = TensorSSA(cvt_f8e4m3_f16_intr(tAgSFA.load(), k_tile), k_tile, Float16)
+sfb_vec = TensorSSA(cvt_f8e4m3_f16_intr(tBgSFB.load(), k_tile), k_tile, Float16)
+
+# Also FP16 now
+tABrAB = a_vec * b_vec
+tSFrSF = sfa_vec * sfb_vec
+```
+
+Now, we can perform 2 Fused-Multiply-Accumulate operations at once on a 32-bit register. 
+Now `r0` and `r1` hold the running partial FMA sums for the corresponding alternative even (`i`) and odd (`i+1`) elements.
+
+```python
+for i in cutlass.range_constexpr(0, 128, 2):
+    r0, r1 = fma_f16x2(
+        (tABrAB[i], tABrAB[i + 1]),
+        (tSFrSF[i], tSFrSF[i + 1]),
+        (r0, r1),
+    )
+```
+
+Now, to combine the partial sums, for the first shape and third shape, I just combined the two `Float16`s 
+into a single `Float16` after the loop with no precision errors
+
+- For the first shape, 
+    ```python
+    res = allocator.allocate_tensor(Float16, layout)
+    r0, r1 = Float16(0), Float16(0)
+
+    for k_block in range(tidy, k_tile_cnt, threads_k):
+    ...
+
+    # After loop
+    res[tidx, tidy, tidz] = r0 + r1
+    arch.sync_threads()
+
+    ...
+    # SMEM reduction
+    ```
+
+- For the third shape, 
+    ```python
+    r0, r1 = Float16(0), Float16(0)
+
+    for k_block in range(tidy, k_tile_cnt, threads_k):
+    ...
+
+    # After loop
+    res = r0 + r1 # Also a Float16
+
+    ...
+    # Warp shuffle reduction
+    ```
+
+But for the second shape, due to precision error accumulation, I had to use a `Float32` accumulator 
+which I had to update in each iteration of the outer loop  
+
+```python
+res = acc_dtype(0)
+for k_block in range(tidy, k_tile_cnt, threads_k):
+
+    ...
+    r0, r1 = sfc_dtype(0), sfc_dtype(0)
+    for i in cutlass.range_constexpr(0, k_tile, 2):
+        r0, r1 = fma_f16x2(
+            (tABrAB[i], tABrAB[i + 1]),
+            (tSFrSF[i], tSFrSF[i + 1]),
+            (r0, r1),
+        )
+
+    res += r0 + r1
+
+...
+# After loop
+# Warp shuffle reduction
+```
+
+
+---
+
+## What it lacks
+
+- CPU overhead from compilation of 3 kernels, rather than 1
+- Didn't use CuTe primitives, pipelines and `tcgen05`.
+
+## Credits 
+
+Once again, I give huge credit to [Simon's blog](https://veitner.bearblog.dev/blog/), 
+to get me started with CuTe and the problem, also for most of the optimizations.
