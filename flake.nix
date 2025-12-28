@@ -76,6 +76,7 @@
               pkgs.miniserve
               pkgs.xmlformat
               pkgs.cargo-flamegraph
+              pkgs.marksman
             ];
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
             CARGO_BUILD_RUSTFLAGS = "-C linker=clang -C link-arg=-fuse-ld=${pkgs.mold}/bin/mold";

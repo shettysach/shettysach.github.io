@@ -2,8 +2,6 @@
 title: Projects
 subtitle: A post to display my personal projects
 tags: [ About, Rust ]
-hmin: 2
-hmax: 2
 ---
 
 # Projects

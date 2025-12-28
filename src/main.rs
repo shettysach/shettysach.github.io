@@ -3,7 +3,6 @@
 mod atom;
 mod generate;
 mod syntex;
-mod toc;
 mod utils;
 
 use anyhow::Result;

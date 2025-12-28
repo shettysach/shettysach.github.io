@@ -1,7 +1,6 @@
 use crate::{
     atom::{Entries, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
-    toc::{Levels, TocIterator},
 };
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
@@ -28,7 +27,7 @@ fn render_markdown(
 ) -> Result<Frontmatter> {
     let markdown = fs::read_to_string(src)?;
 
-    let (frontmatter, levels) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
+    let frontmatter = process_metadata(Parser::new_ext(&markdown, OPTIONS))
         .and_then(Frontmatter::parse_metadata)
         .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
 
@@ -42,24 +41,8 @@ fn render_markdown(
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
     let parser = Parser::new_ext(&markdown, OPTIONS);
-
-    if let Some(levels) = levels {
-        let mut toc_iter = TocIterator::new(parser, levels);
-        writer.write_all(b"<div class=\"flex-wrapper\">")?;
-
-        writer.write_all(b"<div>")?;
-        write_html_io(&mut writer, &mut toc_iter)?;
-        writer.write_all(b"</div>")?;
-
-        let toc_html = toc_iter.toc();
-        writer.write_all(b"<aside><details><summary>Table of contents</summary>")?;
-        writer.write_all(toc_html.as_bytes())?;
-        writer.write_all(b"</details></aside>")?;
-
-        writer.write_all(b"</div>")?;
-    } else {
-        write_html_io(&mut writer, CustomIterator::new(parser))?;
-    }
+    let parser = CustomIterator::new(parser);
+    write_html_io(&mut writer, parser)?;
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
@@ -143,8 +126,7 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     let frontmatter = process_metadata(Parser::new_ext(&index_md, OPTIONS))
         .and_then(Frontmatter::parse_metadata)
-        .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?
-        .0;
+        .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
 
     let file = fs::File::create(html_dir.join("index.html"))?;
     let mut writer = BufWriter::new(file);
@@ -260,30 +242,19 @@ impl Frontmatter {
         label
     }
 
-    fn parse_metadata(doc: Yaml) -> Option<(Frontmatter, Option<Levels>)> {
+    fn parse_metadata(doc: Yaml) -> Option<Frontmatter> {
         let title = doc["title"].as_str()?.to_string();
         let subtitle = doc["subtitle"].as_str().map(str::to_string);
         let tags = doc["tags"]
             .as_vec()
             .and_then(|vec| vec.iter().map(|v| v.as_str().map(str::to_string)).collect());
-        let levels = doc["hmin"]
-            .as_i64()
-            .zip(doc["hmax"].as_i64())
-            .and_then(|(min, max)| {
-                let min: u8 = min.try_into().ok()?;
-                let max: u8 = max.try_into().ok()?;
-                Levels::new(min, max)
-            });
         let draft = doc["draft"].as_bool().unwrap_or(false);
 
-        Some((
-            Frontmatter {
-                title,
-                subtitle,
-                tags,
-                draft,
-            },
-            levels,
-        ))
+        Some(Frontmatter {
+            title,
+            subtitle,
+            tags,
+            draft,
+        })
     }
 }

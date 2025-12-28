@@ -37,6 +37,9 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
             }
 
+            // Currently has some inconsistent highlighting due to
+            // linewise highlighting for codeblocks within bullets
+            // Collecting in string solves this, but heap allocates
             Event::Text(code) if let Some(lang) = self.code.as_mut() => {
                 let highlighted = highlight_code(&code, lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
@@ -85,11 +88,10 @@ pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
         .source(code)
         .lang(match syntax_tag {
-            "rs" | "rust" => Language::Rust,
-            "py" | "python" => Language::Python,
-            "tex" | "latex" => Language::LaTeX,
+            "rust" | "rs" => Language::Rust,
+            "python" | "py" => Language::Python,
+            "latex" | "tex" => Language::LaTeX,
             "html" => Language::HTML,
-            // "git" => Language::Diff,
             _ => Language::PlainText,
         })
         .pre_class(None)
