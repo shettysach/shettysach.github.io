@@ -41,8 +41,11 @@ fn render_markdown(
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
     let parser = Parser::new_ext(&markdown, OPTIONS);
-    let parser = CustomIterator::new(parser);
-    write_html_io(&mut writer, parser)?;
+    // let parser = CustomIterator::new(parser);
+    // write_html_io(&mut writer, parser)?;
+
+    let mut parser = crate::anchor::AnchorIterator::new(parser);
+    write_html_io(&mut writer, &mut parser)?;
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;

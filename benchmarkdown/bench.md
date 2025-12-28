@@ -8,8 +8,5 @@ This is the index for benchmarking.
 
 ## Bench $H$ Index 
 
-## Posts
 
-- [Small](small.md)
-- [Medium](medium.md)
-- [Large](large.md)
+### Bench `H` Index 

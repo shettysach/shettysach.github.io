@@ -10,11 +10,6 @@ yaml-rust2 = "0.10.3"
 quick-xml = "0.31"
 pulldown-latex = "0.7.1"
 pulldown-cmark = "0.13.0"
-fastbloom = "0.14.0"
-
-[dependencies.xxhash-rust]
-version = "0.8.15"
-features = [ "xxh32" ]
 
 [dependencies.chrono]
 version = "0.4"

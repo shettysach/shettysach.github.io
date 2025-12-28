@@ -32,6 +32,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.next()? {
+            // -- Code --
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
                 Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
@@ -39,7 +40,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 
             // Currently has some inconsistent highlighting due to
             // linewise highlighting for codeblocks within bullets
-            // Collecting in string solves this, but heap allocates
+            // Collecting in string solves this, but heap allocs
             Event::Text(code) if let Some(lang) = self.code.as_mut() => {
                 let highlighted = highlight_code(&code, lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
@@ -50,6 +51,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 Some(event)
             }
 
+            // -- Math
             Event::DisplayMath(latex) => {
                 let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
                 Some(Event::Html(CowStr::from(mathml)))

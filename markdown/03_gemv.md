@@ -11,6 +11,34 @@ draft: true
 
 # NVFP4 Batched GEMV
 
+<!--toc:start-->
+- [NVFP4 Batched GEMV](#nvfp4-batched-gemv)
+  - [Problem to be optimized](#problem-to-be-optimized)
+    - [GEMV](#gemv)
+    - [Batched GEMV](#batched-gemv)
+    - [Batched block-scaled GEMV](#batched-block-scaled-gemv)
+  - [CuTe DSL](#cute-dsl)
+  - [Reference kernel](#reference-kernel)
+    - [Setup](#setup)
+    - [CuTe kernel](#cute-kernel)
+    - [Host-side launcher](#host-side-launcher)
+    - [Kernel compilation and caching](#kernel-compilation-and-caching)
+    - [Entry point](#entry-point)
+  - [Optimizations](#optimizations)
+    - [Restructuring the multiplication and accumulation](#restructuring-the-multiplication-and-accumulation)
+    - [Parallelism over dimensions](#parallelism-over-dimensions)
+      - [Parallelism over $M$ (output rows)](#parallelism-over-m-output-rows)
+      - [Parallelism over $L$ (batch dimension):](#parallelism-over-l-batch-dimension)
+      - [Parallelism over $K$ (the reduction dimension)](#parallelism-over-k-the-reduction-dimension)
+      - [Parallelism over $L$ inside a block (via `threads_l`)](#parallelism-over-l-inside-a-block-via-threadsl)
+    - [Reduction of partial sums (combining the $K$ work)](#reduction-of-partial-sums-combining-the-k-work)
+      - [SMEM reduction](#smem-reduction)
+      - [Warp shuffle reduction](#warp-shuffle-reduction)
+    - [Using FP16 Fused-Multiply-Accumulate](#using-fp16-fused-multiply-accumulate)
+  - [What it lacks](#what-it-lacks)
+  - [Credits](#credits)
+<!--toc:end-->
+
 This article details my submission for the [GPUMODE nvfp4_gemv leaderboard](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
 and the various techniques I used to iterate over the reference kernel to make it faster, but also what it lacked.
 A big credit goes to [Simon's blog](https://veitner.bearblog.dev/blog/).
@@ -651,7 +679,8 @@ tSFrSF = sfa_vec * sfb_vec
 ```
 
 Now, we can perform 2 Fused-Multiply-Accumulate operations at once on a 32-bit register. 
-Now `r0` and `r1` hold the running partial FMA sums for the corresponding alternative even (`i`) and odd (`i+1`) elements.
+Now `r0` and `r1` hold the running partial FMA sums for the corresponding alternate even (`i`) and odd (`i+1`) elements. 
+Each iteration performs `r0 += tABrAB[i] * tSFrSF[i] + r0` and `r1 += tABrAB[i+1] * tSFrSF[i+1] + r1`.
 
 ```python
 for i in cutlass.range_constexpr(0, 128, 2):
@@ -726,10 +755,9 @@ The improved kernel is still far from optimal.
 The blogpost [tcgen05 for dummies, from gau-nernst's blog](https://gau-nernst.github.io/tcgen05/) 
 goes into detail about writing efficient kernels with the `tcgen05` set.
 
-## Credits 
+## Credits
 
 Again, I give huge credit to [Simon's blog](https://veitner.bearblog.dev/blog/), 
 to get me started with CuTe and the problem, also for most of the optimizations.
 You can find my submission at the [leaderboard page](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
 under the name swanbomb_ (25.989μs).
-
