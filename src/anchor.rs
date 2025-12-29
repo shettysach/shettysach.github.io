@@ -41,12 +41,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for &mut AnchorIterator<'a, I> 
 
     fn next(&mut self) -> Option<Self::Item> {
         if let HeadingCapture::Emitting(ref mut h_events, level) = self.heading {
-            return Some(if let Some(event) = h_events.pop() {
-                event
-            } else {
-                self.heading = HeadingCapture::Inactive;
-                Event::End(TagEnd::Heading(level))
-            });
+            let w = match h_events.pop() {
+                Some(Event::InlineMath(ref latex)) => {
+                    let mathml =
+                        latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
+                    Event::InlineHtml(CowStr::from(mathml))
+                }
+                Some(event) => event,
+                None => {
+                    self.heading = HeadingCapture::Inactive;
+                    Event::End(TagEnd::Heading(level))
+                }
+            };
+            return Some(w);
         };
 
         match self.inner.next()? {
@@ -121,6 +128,16 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for &mut AnchorIterator<'a, I> 
                     classes,
                     attrs,
                 }))
+            }
+
+            Event::InlineHtml(CowStr::Borrowed("<!--toc:start-->\n"))
+            | Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
+                CowStr::Borrowed("<details><summary>Contents</summary>"),
+            )),
+
+            Event::InlineHtml(CowStr::Borrowed("<!--toc:end-->\n"))
+            | Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
+                Some(Event::Html(CowStr::Borrowed("</details>")))
             }
 
             event if let HeadingCapture::Capturing(ref mut head) = self.heading => {
