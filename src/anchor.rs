@@ -41,7 +41,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let HeadingCapture::Emitting(ref mut h_events, level) = self.heading {
-            let w = match h_events.pop() {
+            return Some(match h_events.pop() {
                 Some(Event::InlineMath(ref latex)) => {
                     let mathml =
                         latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
@@ -52,8 +52,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                     self.heading = HeadingCapture::Inactive;
                     Event::End(TagEnd::Heading(level))
                 }
-            };
-            return Some(w);
+            });
         };
 
         match self.inner.next()? {
