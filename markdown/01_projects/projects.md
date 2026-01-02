@@ -2,9 +2,22 @@
 title: Projects
 subtitle: A post to display my personal projects
 tags: [ About, Rust ]
+anchors: true
 ---
 
 # Projects
+
+<!--toc:start-->
+- [Projects](#projects)
+  - [Loxi](#loxi)
+  - [ferrograd](#ferrograd)
+  - [Kannada Handwriting Calculator](#kannada-handwriting-calculator)
+  - [CandleMist](#candlemist)
+  - [veNum](#venum)
+  - [Termfolio](#termfolio)
+  - [Cohle](#cohle)
+  - [Liquid-Oxygen](#liquid-oxygen)
+<!--toc:end-->
 
 These are some of my personal projects.
 

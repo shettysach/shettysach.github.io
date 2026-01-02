@@ -1,6 +1,6 @@
 ---
 title: Rendering math and highlighting code
-subtitle: How the blog renders math and highlights syntax, using static HTML and CSS.
+subtitle: How the blog renders math and highlights syntax, using static HTML and CSS
 tags:
     - SSG
     - Blog
@@ -23,7 +23,7 @@ $$
 
 ### LaTeX
 
-LaTeX is a high-quality typesetting system; it includes features designed for the production of technical and scientific documentation. LaTeX is the de facto standard for the communication and publication of scientific documents. LaTeX is available as free software. [[The Latex Project]](https://www.latex-project.org/)
+LaTeX is a high-quality typesetting system; it includes features designed for the production of technical and scientific documentation. LaTeX is the de facto standard for the communication and publication of scientific documents. LaTeX is available as free software. From [The Latex Project](https://www.latex-project.org/).
 
 LaTeX representation of the above equation:
 ```latex
@@ -36,7 +36,7 @@ However, web browsers and standard HTML cannot directly interpret LaTeX syntax. 
 
 Mathematical Markup Language (MathML) is an XML-based language for describing mathematical notation.
 MathML Core is a subset with increased implementation details based on rules from LaTeX and the Open Font Format. It is tailored for browsers and designed specifically to work well with other web standards including HTML, CSS, DOM, JavaScript.
-[[MDN Web Docs]](https://developer.mozilla.org/en-US/docs/Web/MathML)
+From the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/MathML).
 
 MathML representation of the above equation:
 ```html
@@ -53,7 +53,7 @@ To convert from LaTeX to MathML, [`pulldown-cmark`](https://crates.io/crates/pul
 
 ```rust
 fn sum_of_cubes_lhs(n: usize) -> usize {
-    (2..=n).map(|i| i * i * i).sum()
+    (1..=n).map(|i| i * i * i).sum()
 }
 
 fn sum_of_cubes_rhs(n: usize) -> usize {
@@ -200,7 +200,7 @@ pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
         .build()?;
 
     let mut output = Vec::new();
-    formatter.format(&mut output)?;
+    formatter.highlights(&mut output)?;
     let html = String::from_utf8(output)?;
 
     Ok(html)

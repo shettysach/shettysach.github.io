@@ -36,7 +36,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> AnchorIterator<'a, I> {
     }
 }
 
-impl<'a, I: Iterator<Item = Event<'a>>> Iterator for &mut AnchorIterator<'a, I> {
+impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {

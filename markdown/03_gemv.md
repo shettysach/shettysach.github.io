@@ -1,13 +1,13 @@
 ---
-title: NVFP4 Batched GEMV
+title: NVFP4 GEMV
 subtitle: My submission for the first round of the GPUMODE Nvfp4 competition 
 tags: [ CuTe DSL ]
+anchors: true
 draft: true
 ---
 
 <!-- TODO:  -->
 <!-- - Explain why fp32 accum -->
-<!-- - be more CuTe focused, CuTe terms -->
 
 # NVFP4 Batched GEMV
 
@@ -25,23 +25,23 @@ draft: true
     - [Kernel compilation and caching](#kernel-compilation-and-caching)
     - [Entry point](#entry-point)
   - [Optimizations](#optimizations)
-    - [Restructuring the multiplication and accumulation](#restructuring-the-multiplication-and-accumulation)
-    - [Parallelism over dimensions](#parallelism-over-dimensions)
+    - [I. Restructuring the multiplication and accumulation](#i-restructuring-the-multiplication-and-accumulation)
+    - [II. Parallelism over dimensions](#ii-parallelism-over-dimensions)
       - [Parallelism over $M$ (output rows)](#parallelism-over-m-output-rows)
       - [Parallelism over $L$ (batch dimension):](#parallelism-over-l-batch-dimension)
       - [Parallelism over $K$ (the reduction dimension)](#parallelism-over-k-the-reduction-dimension)
       - [Parallelism over $L$ inside a block (via `threads_l`)](#parallelism-over-l-inside-a-block-via-threadsl)
-    - [Reduction of partial sums (combining the $K$ work)](#reduction-of-partial-sums-combining-the-k-work)
+    - [III. Reduction of partial sums (combining the $K$ work)](#iii-reduction-of-partial-sums-combining-the-k-work)
       - [SMEM reduction](#smem-reduction)
       - [Warp shuffle reduction](#warp-shuffle-reduction)
-    - [Using FP16 Fused-Multiply-Accumulate](#using-fp16-fused-multiply-accumulate)
-  - [What it lacks](#what-it-lacks)
-  - [Credits](#credits)
+    - [IV. Using FP16 Fused-Multiply-Accumulate](#iv-using-fp16-fused-multiply-accumulate)
+    - [V. Shape specific tuning](#v-shape-specific-tuning)
+  - [Flaws](#flaws)
+  - [Credits and thank you](#credits-and-thank-you)
 <!--toc:end-->
 
 This article details my submission for the [GPUMODE nvfp4_gemv leaderboard](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
-and the various techniques I used to iterate over the reference kernel to make it faster, but also what it lacked.
-A big credit goes to [Simon's blog](https://veitner.bearblog.dev/blog/).
+and the various techniques I used to improve over the reference kernel to make it faster, but also what it lacked.
 
 ---
 
@@ -75,7 +75,7 @@ $C$ is a vector of shape $M \times 1 \times L$.
 ### Batched block-scaled GEMV
 
 $$
-C[x,0,z] \;=\; \sum_{y=0}^{K-1} \Bigl(A[x,y,z]\;\mathrm{SFA}[x,y,z]\Bigr)\; \Bigl(B[y,0,z]\;\mathrm{SFB}[y,0,z]\Bigr)
+C[x,0,z] \;=\; \sum_{y=0}^{K-1} A[x,y,z]\;\mathrm{SFA}[x,y,z]\; B[y,0,z]\;\mathrm{SFB}[y,0,z]
 $$
 
 - In batched block-scaled GEMV, each value is paired with a scale factor - 
@@ -85,9 +85,9 @@ $C$ is a vector of shape $M \times 1 \times L$.
 
 This is the mathematical explanation of the problem. In memory,
 - `a`, `b`, `sfa`, `sfb` and `c` are Torch tensors, later casted to CuTe tensors.
-- `a` and `b` are of fp4 dtype, while `sfa` and `sfb` are of fp8 dtype. 
+- `a` and `b` are of FP4 dtype, particulary [NVFP4](https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/), while `sfa` and `sfb` are of FP8 dtype. 
 - `a` and `sfa` are layed out as `(m, k, l)`, while `b` and `sfb` are layed out as `(128, k, l)`, permuted and padded for easier tiling.
-- `c` is of fp16 dtype and layed out as `(m, 1, l)`.
+- `c` is of FP16 dtype and layed out as `(m, 1, l)`.
 
 There are 3 shapes to target, `n` is always 1 since GEMV
 - `m: 7168, k: 16384, l: 1`
@@ -140,8 +140,8 @@ It performs the batched block-scaled GEMV operation.
 1. Each CTA handles a tile of the output `c` - 128 rows x 1 column (`mma_tiler_mnk[:2]`) for one batch $l$.
 2. Each thread (`tidx`) is responsible for 1 output element `c[x,0,z]` within that tile.
 3. CuTe’s `local_tile` creates matching tiled views of `a, b, sfa, sfb, c`, so the right chunks line up in memory.
-4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`): load fp4 and fp8, convert to fp32, then accumulate the scaled products.
-5. After all $K$ tiles are processed, it casts fp32 to fp16 and stores the result to `c`.
+4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`): load FP4 and FP8, convert to FP32, then accumulate the scaled products.
+5. After all $K$ tiles are processed, it casts FP32 to fp16 and stores the result to `c`.
 
 
 ```py
@@ -265,7 +265,7 @@ def my_kernel(
 
 ### Kernel compilation and caching
 
-`compile_kernel` JIT-compiles my_kernel once and stores the compiled result in `_compiled_kernel_cache`. On later calls, it returns the cached compiled function so you don’t pay compilation overhead again.
+`compile_kernel` JIT-compiles `my_kernel` once and stores the compiled result in `_compiled_kernel_cache`. On later calls, it returns the cached compiled function so you don’t pay compilation overhead again.
 
 It creates dummy CuTe pointers with the right dtypes and address space (global memory). These are only used to tell the compiler the argument types/layout expectations. It calls `cute.compile(...)` with those pointer types and a placeholder problem size `(0, 0, 0, 0)` to produce a callable compiled kernel.
 
@@ -343,7 +343,7 @@ def custom_kernel(data: input_t) -> output_t:
 
 ## Optimizations
 
-### Restructuring the multiplication and accumulation
+### I. Restructuring the multiplication and accumulation
 
 In the reference kernel, each iteration does this
 - Load FP4/FP8 values from global memory.
@@ -405,10 +405,7 @@ for i in cutlass.range_constexpr(mma_tiler_mnk[2]):
     res += tABrAB[i] * tSFrSF[i]
 ```
 
----
-
-
-### Parallelism over dimensions
+### II. Parallelism over dimensions
 
 The reference kernel implements
 
@@ -480,17 +477,16 @@ New launch parameters. Now threads handle each dimension. They need to adhere to
 # Inside `my_kernel`:
 kernel(...).launch(
     grid=(
-           ceil_div(size[0], threads_m),
-           1,
-           ceil_div(size[3], threads_l),  # to cover L batches, each block handles `threads_l` indices
-       ),
-       block=[threads_k, threads_m, threads_l],
-       cluster=(1, 1, 1),
-   )
-   ```
----
+        ceil_div(size[0], threads_m),
+        1,
+        ceil_div(size[3], threads_l),  # to cover L batches, each block handles `threads_l` indices
+    ),
+    block=[threads_k, threads_m, threads_l],
+    cluster=(1, 1, 1),
+)
+```
 
-### Reduction of partial sums (combining the $K$ work)
+### III. Reduction of partial sums (combining the $K$ work)
 
 Once we split the $K$ loop across `threads_k` threads (via `tidy`), each thread computes a partial sum for the same output element. We then need to reduce across `tidy`to get the final dot product for that output. There are two ways we do this.
 
@@ -580,17 +576,15 @@ This avoids shared memory and avoids `sync_threads`, so it’s usually faster as
 
 The first shape `(7168, 16384, 1)` was faster with the SMEM reduction while the other 2 were faster with the warp shuffle reduction.
 
----
-
-### Using FP16 Fused-Multiply-Accumulate
+### IV. Using FP16 Fused-Multiply-Accumulate
 
 This is based entirely on [Simon's blogpost](https://veitner.bearblog.dev/demystifying-numeric-conversions-in-cutedsl/).
-The B200 has 32-bit registers. As of yet we have been performing 1 fp16 calculation on these registers at a time.
-However, we can actually perform 2 fp16 calculations instead, using it's full 32-bit capacity.
+The B200 has 32-bit registers. As of yet we have been performing 1 FP16 calculation on these registers at a time.
+However, we can actually perform 2 FP16 calculations instead, using it's full 32-bit capacity.
 
-We can convert NVFP4 vectors `a_vec` and `b_vec` to fp16 using the `.to(Float16)` method in the TensorSSA class. 
+We can convert NVFP4 vectors `a_vec` and `b_vec` to FP16 using the `.to(Float16)` method in the TensorSSA class. 
 However, to convert FP8 vectors `sfa_vec` and `sfb_vec`, I had to use these low-level PTX instructions from [Simon's blogpost](https://veitner.bearblog.dev/demystifying-numeric-conversions-in-cutedsl/), which goes into more details. 
-Since I always use it on vectors of length 128 , I could simplify it and only use the part for vectors perfectly divisible by 8.    
+Since I always use it on vectors of length 128 , I could simplify it and only use the part for vectors of length divisible by 8.    
 
 ```python
 @dsl_user_op
@@ -704,7 +698,6 @@ into a single `Float16` after the loop with no precision errors.
         for i in cutlass.range_constexpr(0, 128, 2):
             r0, r1 = fma_f16x2(...)
 
-    # After loop
     res[tidx, tidy, tidz] = r0 + r1
     arch.sync_threads()
 
@@ -721,7 +714,6 @@ into a single `Float16` after the loop with no precision errors.
         for i in cutlass.range_constexpr(0, 128, 2):
             r0, r1 = fma_f16x2(...)
 
-    # After loop
     res = r0 + r1 # Also a Float16
 
     ...
@@ -742,22 +734,54 @@ for k_block in range(tidy, k_tile_cnt, threads_k):
     res += r0 + r1
 
 ...
-# After loop
 # Warp shuffle reduction
+```
+
+### V. Shape specific tuning
+
+The most straightforward optimization. Tuning the number of threads per dimension for each of the 3 shapes.
+I tuned the tile sizes after applying each of the above optimizations and restructuring the file, 
+settling for these values at the end.
+
+```py
+def select_threads(m: int, k: int, l: int) -> tuple[int, int, int]:
+    if (m, k, l) == (7168, 16384, 1):
+        return (64, 16, 1)
+
+    if (m, k, l) == (4096, 7168, 8):
+        return (64, 4, 4)
+
+    if (m, k, l) == (7168, 2048, 4):
+        return (256, 4, 1)
+
+    return (128, 8, 1)
+```
+
+Based on the threads, I chose the tile sizes like this.
+I experimented with k_tile = 256, but found 128 to be the best in the end.
+
+```py
+m_tile = threads_m
+k_tile = 128
+mnk_tile = (m_tile, 1, k_tile)
 ```
 
 ---
 
-## What it lacks
+## Flaws
 
-The improved kernel is still far from optimal.
+The improved kernel is still far from optimal. CuTe gives you building blocks for Tensor Core MMA (via `tcgen05`), pipelines for data movement (so loads and compute overlap), and shared-memory tiling patterns that make sure threads cooperate and reuse data efficiently. In my version, I’m still mostly doing a manual load, convert, compute loop and only using CuTe for tiling and launching, so I’m not taking advantage of those higher-level features.
 
-The blogpost [tcgen05 for dummies, from gau-nernst's blog](https://gau-nernst.github.io/tcgen05/) 
-goes into detail about writing efficient kernels with the `tcgen05` set.
+The blogpost [tcgen05 for dummies, from gau-nernst's blog](https://gau-nernst.github.io/tcgen05/) goes into detail about writing efficient kernels with the `tcgen05` set. The CUTLASS repo also provides [CuTe examples for Blackwell GPUS](https://github.com/NVIDIA/cutlass/tree/main/examples/python/CuTeDSL/blackwell) for various GEMM variants.
+I did go on to use these features in the kernels for the next rounds, 
+modifying the [dense_blockscaled_gemm_persistent.py](https://github.com/NVIDIA/cutlass/blob/main/examples/python/CuTeDSL/blackwell/dense_blockscaled_gemm_persistent.py) example.
 
-## Credits
+## Credits and thank you
 
 Again, I give huge credit to [Simon's blog](https://veitner.bearblog.dev/blog/), 
-to get me started with CuTe and the problem, also for most of the optimizations.
+to get me started with CuTe and the problem, also for applying most of the optimizations.
+
+Thank you for reading this article.
+This was my first submission to a kernel optimization contest and I learnt a lot in the process.
 You can find my submission at the [leaderboard page](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
 under the name swanbomb_ (25.989μs).

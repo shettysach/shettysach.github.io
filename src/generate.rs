@@ -1,10 +1,10 @@
 use crate::{
-    atom::{Entries, generate_atom_feed, generate_sitemap},
-    syntex::{CustomIterator, OPTIONS, process_metadata},
+    atom::{generate_atom_feed, generate_sitemap, Entries},
+    syntex::{process_metadata, CustomIterator, OPTIONS},
 };
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{Parser, html::write_html_io};
+use pulldown_cmark::{html::write_html_io, Parser};
 use std::{
     collections::HashMap,
     fs,
@@ -27,7 +27,7 @@ fn render_markdown(
 ) -> Result<Frontmatter> {
     let markdown = fs::read_to_string(src)?;
 
-    let frontmatter = process_metadata(Parser::new_ext(&markdown, OPTIONS))
+    let (frontmatter, anchors) = process_metadata(Parser::new_ext(&markdown, OPTIONS))
         .and_then(Frontmatter::parse_metadata)
         .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
 
@@ -41,11 +41,14 @@ fn render_markdown(
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
     let parser = Parser::new_ext(&markdown, OPTIONS);
-    // let parser = CustomIterator::new(parser);
-    // write_html_io(&mut writer, parser)?;
 
-    let mut parser = crate::anchor::AnchorIterator::new(parser);
-    write_html_io(&mut writer, &mut parser)?;
+    if anchors {
+        let parser = crate::anchor::AnchorIterator::new(parser);
+        write_html_io(&mut writer, parser)?;
+    } else {
+        let parser = CustomIterator::new(parser);
+        write_html_io(&mut writer, parser)?;
+    }
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
@@ -64,7 +67,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 
     for entry in WalkDir::new(markdown_dir)
         .max_depth(2)
-        .sort_by_file_name()
+        .sort_by(|b, a| a.file_name().cmp(b.file_name()))
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.file_name() != "index.md" && e.path() != markdown_dir)
@@ -127,7 +130,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
 
-    let frontmatter = process_metadata(Parser::new_ext(&index_md, OPTIONS))
+    let (frontmatter, _) = process_metadata(Parser::new_ext(&index_md, OPTIONS))
         .and_then(Frontmatter::parse_metadata)
         .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
 
@@ -245,19 +248,23 @@ impl Frontmatter {
         label
     }
 
-    fn parse_metadata(doc: Yaml) -> Option<Frontmatter> {
+    fn parse_metadata(doc: Yaml) -> Option<(Frontmatter, bool)> {
         let title = doc["title"].as_str()?.to_string();
         let subtitle = doc["subtitle"].as_str().map(str::to_string);
         let tags = doc["tags"]
             .as_vec()
             .and_then(|vec| vec.iter().map(|v| v.as_str().map(str::to_string)).collect());
         let draft = doc["draft"].as_bool().unwrap_or(false);
+        let anchors = doc["anchors"].as_bool().unwrap_or(false);
 
-        Some(Frontmatter {
-            title,
-            subtitle,
-            tags,
-            draft,
-        })
+        Some((
+            Frontmatter {
+                title,
+                subtitle,
+                tags,
+                draft,
+            },
+            anchors,
+        ))
     }
 }
