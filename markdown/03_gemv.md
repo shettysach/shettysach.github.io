@@ -8,7 +8,7 @@ anchors: true
 # NVFP4 GEMV
 
 <!--toc:start-->
-- [NVFP4 Batched GEMV](#nvfp4-batched-gemv)
+- [NVFP4 GEMV](#nvfp4-gemv)
   - [Problem to be optimized](#problem-to-be-optimized)
     - [GEMV](#gemv)
     - [Batched GEMV](#batched-gemv)
@@ -32,8 +32,8 @@ anchors: true
       - [Warp shuffle reduction](#warp-shuffle-reduction)
     - [IV. Using FP16 Fused-Multiply-Accumulate](#iv-using-fp16-fused-multiply-accumulate)
     - [V. Shape specific tuning](#v-shape-specific-tuning)
-  - [Flaws](#flaws)
   - [Ideas that didn't pay off](#ideas-that-didnt-pay-off)
+  - [Flaws](#flaws)
   - [Credits and thank you](#credits-and-thank-you)
 <!--toc:end-->
 
@@ -105,7 +105,7 @@ I based my implementation on the CuTe template kernel, `template_cute.py`, that 
 
 ### Setup
 
-This sets up the required imports, the data types of the input, output and scale factor matrices, and parameters such as the tile size and number of threads per CUDA thread block / CTA (Cooperative Thread Array). 
+This sets up the required imports, the data types of the input, output, and scale factor matrices, and parameters such as the tile size and number of threads per CUDA thread block / CTA (Cooperative Thread Array). 
 
 ```py
 from task import input_t, output_t
@@ -342,7 +342,7 @@ def custom_kernel(data: input_t) -> output_t:
 
 ### I. Restructuring the multiplication and accumulation
 
-In the reference kernel, each iteration does this
+In the reference kernel, each iteration does this.
 - Load FP4/FP8 values from global memory.
 - Convert them to FP32.
 - Store the converted vectors into separate (RMEM) tensors (`tArA`, `tBrB`, `tArSFA`, `tBrSFB`). 
@@ -373,15 +373,8 @@ for i in cutlass.range_constexpr(mma_tiler_mnk[2]):
 ```
 
 In the new version, we keep the same load and convert step, but instead of creating 4 RMEM tensors and storing into them, we
-- Compute the two products, one with the data and another with the scale factors. 
-	- `tABrAB = a_vec * b_vec` 
-	- `tSFrSF = sfa_vec * sfb_vec` 
-- Then the inner loop becomes a multiply-accumulate.
-
-The `tABrAB` and `tSFrSF` and the `*_vec` variables,  are `TensorSSA`s. The computation happens in the registers.
-Here is a Jupyter notebook from the CUTLASS repo, [tensorssa.ipynb](https://github.com/NVIDIA/cutlass/blob/main/examples/python/CuTeDSL/notebooks/tensorssa.ipynb) that explains the `TensorSSA` abstraction and how to use them. 
-                       
-This provides a small speedup and makes it easier for later optimizations.
+compute the two products, one with the data and another with the scale factors, `tABrAB = a_vec * b_vec` and `tSFrSF = sfa_vec * sfb_vec`. 
+Then the inner loop becomes a multiply-accumulate.
 
 ```py
 # Load NVFP4 or FP8 values from global memory
@@ -404,6 +397,11 @@ tSFrSF = sfa_vec * sfb_vec
 for i in cutlass.range_constexpr(mma_tiler_mnk[2]):
     res += tABrAB[i] * tSFrSF[i]
 ```
+
+The `tABrAB` and `tSFrSF` and the `*_vec` variables, are `TensorSSA` and the computation happens in the registers.
+Here is a Jupyter notebook from the CUTLASS repo, [tensorssa.ipynb](https://github.com/NVIDIA/cutlass/blob/main/examples/python/CuTeDSL/notebooks/tensorssa.ipynb) that explains the `TensorSSA` abstraction and how to use them. 
+                       
+This provides a small speedup and makes it easier for later optimizations.
 
 ### II. Parallelism over dimensions
 
@@ -452,7 +450,7 @@ Based on [Simon's blogpost](https://veitner.bearblog.dev/nvfp4-gemv-improved/), 
 
 #### Parallelism over $K$ (the reduction dimension)
 - In the reference kernel, one thread computes the full dot product over all $K$ elements for its output.
-- In the new kernel, we split that work across multiple threads using `tidy`. Each thread handles a subset of the $K$ tiles in a strided loop.
+- In the new kernel, we split that work across multiple threads using `tidy`. Each thread handles a subset of the $K$ tiles in a loop.
 
 #### Parallelism over $L$ inside a block (via `threads_l`)
 - Instead of having one block handle only one batch index $l$, we let a block cover multiple $l$ values using `tidz`.
@@ -579,7 +577,7 @@ We can use warp operations like shuffle to let those 32 threads share values qui
 
 This avoids shared memory and avoids `sync_threads`, so it’s usually faster as long as the participating threads are in one warp.
 
-The shape 1 `(7168, 16384, 1)` was faster with the SMEM reduction while the other 2 were faster with the warp shuffle reduction.
+Shape 1 `(7168, 16384, 1)` was faster with the SMEM reduction while the other 2 were faster with the warp shuffle reduction.
 
 ### IV. Using FP16 Fused-Multiply-Accumulate
 
@@ -587,7 +585,7 @@ This is based entirely on [Simon's blogpost](https://veitner.bearblog.dev/demyst
 The B200 has 32-bit registers. As of yet we have been converting FP4 and FP8 to FP32, then performing 1 FP32 calculation on these registers at a time.
 However, we can actually convert them to FP16 and then perform 2 FP16 calculations on a single 32-bit register using 2 16-bit lanes, but we have to take precision errors into consideration.
 
-We can convert NVFP4 vectors `a_vec` and `b_vec` to FP16 using the `.to(Float16)` method in the TensorSSA class. 
+We can convert NVFP4 vectors `a_vec` and `b_vec` to FP16 using the `.to(Float16)` method in the `TensorSSA` class. 
 However, to convert FP8 vectors `sfa_vec` and `sfb_vec`, we have to use these low-level PTX instructions from [Simon's blogpost](https://veitner.bearblog.dev/demystifying-numeric-conversions-in-cutedsl/), which goes more into depth. 
 Since I always use it on vectors of length 128 , I could simplify it and only use the part for vectors of length divisible by 8.    
 
@@ -664,7 +662,7 @@ def cvt_f8e4m3x8_to_f16x8(src_vec8, *, loc=None, ip=None):
     return vec_f16x8
 ```
 
-Converting the vectors to Float16.
+Converting the vectors to FP16.
 
 ```python
 a_vec = tAgA.load().to(Float16)
@@ -678,7 +676,7 @@ tSFrSF = sfa_vec * sfb_vec
 ```
 
 Now, we can perform 2 16-bit Fused-Multiply-Accumulate (FMA) operations at once in a 32-bit register.
-`fma.rn.f16x2` is the PTX instruction to perform the 2 FMAs and round to the representable number. 
+`fma.rn.f16x2` is the PTX instruction to perform the 2 FMAs and round to the nearest representable number. 
 
 ```python
 @dsl_user_op
@@ -786,7 +784,7 @@ into a single FP16 after the loop with no precision errors.
     # Warp shuffle reduction
     ```
 
-But for shape 2, due to precision error accumulation, I had to use a FP32 accumulator 
+But for shape 2, due to precision error accumulation, I had to use an FP32 accumulator 
 which I had to update in each iteration of the outer loop.
 
 ```python
@@ -834,6 +832,15 @@ mnk_tile = (m_tile, 1, k_tile)
 
 ---
 
+## Ideas that didn't pay off
+
+Manually prefetching tiles didn’t help. However, like I'll elaborate in the next section, using copy primitives and pipelining provided by CuTe such as [Copy Atom](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl_api/cute.html#cutlass.cute.CopyAtom) likely could have helped.
+
+Using 2 16-bit lane addition and multiplication using the PTX instructions `add.f16x2` and `mul.rn.f16x2`, similar to the FMA optimization, 
+didn't provide a speedup probably because the compiler already optimized this. I also tried reducing `r0` and `r1` separately, then combining them at the end, but it either introduced small precision differences or didn’t improve performance.
+
+I also experimented with manual loop unrolling, but it didn’t help. CuTe unrolls the fixed-size loops well. Similarly, I tried tweaking compilation options (optimization level, explicit GPU architecture, and PTXAS flags like `--maxrregcount`), but the defaults were already optimal.
+
 ## Flaws
 
 The improved kernel is still far from optimal. CuTe gives you building blocks for Tensor Core MMA via the `tcgen05` set for Blackwell, pipelines for data movement (so loads and compute overlap), and shared-memory tiling patterns that make sure threads cooperate and reuse data efficiently. 
@@ -846,21 +853,18 @@ modifying the [dense_blockscaled_gemm_persistent.py](https://github.com/NVIDIA/c
 Apart from that, even with this manual approach, I should still be able to improve things like memory access patterns and register pressure/occupancy.
 A combination of higher-level CuTe features (like copy primitives, swizzled layouts), together with this manual approach could have helped, but I wasn’t familiar enough with CuTe at the time to use them effectively.
 
-## Ideas that didn't pay off
-
-Manually prefetching tiles didn’t help. However, like I said above, using copy primitives and pipelining provided by CuTe such as [Copy Atom](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl_api/cute.html#cutlass.cute.CopyAtom) likely could have helped.
-
-Using 2 16-bit addition and multiplication using the PTX instructions `add.f16x2` and `mul.rn.f16x2`, 
-didn't provide a speedup probably because the compiler already optimized this. I also tried reducing `r0` and `r1` separately, then combining them at the end, but it either introduced small precision differences or didn’t improve performance.
-
-I also experimented with manual loop unrolling, but it didn’t help, CuTe unrolls the fixed-size loops well. Similarly, I tried tweaking compilation options (optimization level, explicit GPU architecture, and PTXAS flags like `--maxrregcount`), but the defaults were already close to optimal.
+Regarding the article itself, it would be much better if I had specified the time taken / speedups after each optimization, but
+I only got the idea to write much later, so I didn’t record them while I was iterating. 
+I could try checking my older submissions, but those intermediate solutions were messy and had ideas scattered across files, 
+so the speedup numbers per optimization wouldn't be very accurate.
 
 ## Credits and thank you
 
 Again, I give huge credit to [Simon's blog](https://veitner.bearblog.dev/blog/), 
-to get me started with CuTe and the problem, also for applying most of the optimizations.
+for helping me get started with CuTe and the problem, and for learning about ways to optimize.
+I'd also like to thank GPUMODE and NVIDIA for organizing the competition.
 
-Thank you for reading this article.
-This was my first submission to a kernel optimization contest and my first worklog.
+This was my first submission to a kernel optimization contest and my first work log.
 You can find my submission at the [leaderboard page](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
 under the name swanbomb_ (25.989μs). I would recommend checking out the faster CuTe solutions to see their approaches too.
+Thank you for reading.
