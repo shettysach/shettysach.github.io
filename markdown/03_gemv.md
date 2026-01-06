@@ -83,8 +83,10 @@ $C$ is a vector of shape $M \times 1 \times L$.
 That's the math. In memory,
 - `a`, `b`, `sfa`, `sfb` and `c` are Torch tensors, passed as CuTe tensor views / pointers.
 - `a` and `b` are of FP4 dtype, particularly [NVFP4](https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/), while `sfa` and `sfb` are of FP8 dtype. 
-- `a` and `sfa` are laid out as `(m, k, l)`, while `b` and `sfb` are laid out as `(128, k, l)`, permuted and padded for easier tiling.
-- `c` is of FP16 dtype and laid out as `(m, 1, l)`. 
+- The tensors are in $K$-major order / row-major order.
+- `a` and `sfa` are given the shape `(m, k, l)` with strides `(k, 1, m * k)`, 
+while `b` and `sfb` are given the shape `(128, k, l)` with strides `(k, 1, 128 * k)`, `n` padded to 128 for easier tiling.
+- `c` is of FP16 dtype and is given the shape `(m, 1, l)` with strides `(1, 1, l)`. 
   
 There are 3 shapes to target, `n` is always 1 since GEMV
 - `m: 7168, k: 16384, l: 1`

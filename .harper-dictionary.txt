@@ -5,4 +5,5 @@ PTX
 PTXAS
 RMEM
 SMEM
+dtype
 dtypes
