@@ -1,10 +1,10 @@
 use crate::{
-    atom::{generate_atom_feed, generate_sitemap, Entries},
-    syntex::{process_metadata, CustomIterator, OPTIONS},
+    atom::{Entries, generate_atom_feed, generate_sitemap},
+    syntex::{CustomIterator, OPTIONS, process_metadata},
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
-use pulldown_cmark::{html::write_html_io, Parser};
+use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use std::{
     collections::HashMap,
     fs,
@@ -40,7 +40,7 @@ fn render_markdown(
 
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
-    let parser = Parser::new_ext(&markdown, OPTIONS);
+    let parser = TextMergeStream::new(Parser::new_ext(&markdown, OPTIONS));
 
     if anchors {
         let parser = crate::anchor::AnchorIterator::new(parser);

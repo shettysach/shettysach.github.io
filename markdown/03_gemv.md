@@ -13,6 +13,7 @@ anchors: true
     - [GEMV](#gemv)
     - [Batched GEMV](#batched-gemv)
     - [Batched block-scaled GEMV](#batched-block-scaled-gemv)
+    - [Representation in memory](#representation-in-memory)
   - [CuTe DSL](#cute-dsl)
   - [Reference kernel](#reference-kernel)
     - [Setup](#setup)
@@ -24,7 +25,7 @@ anchors: true
     - [I. Restructuring the multiplication and accumulation](#i-restructuring-the-multiplication-and-accumulation)
     - [II. Parallelism over dimensions](#ii-parallelism-over-dimensions)
       - [Parallelism over $M$ (output rows)](#parallelism-over-m-output-rows)
-      - [Parallelism over $L$ (batch dimension):](#parallelism-over-l-batch-dimension)
+      - [Parallelism over $L$ (batch dimension)](#parallelism-over-l-batch-dimension)
       - [Parallelism over $K$ (the reduction dimension)](#parallelism-over-k-the-reduction-dimension)
       - [Parallelism over $L$ inside a block (via `threads_l`)](#parallelism-over-l-inside-a-block-via-threadsl)
     - [III. Reduction of partial sums (combining the $K$ work)](#iii-reduction-of-partial-sums-combining-the-k-work)
@@ -80,12 +81,14 @@ $A[x,y,z]$ is scaled by $\mathrm{SFA}[x,y,z]$, while $B[y,0,z]$ is scaled by $\m
 - $A$ and $SFA$ are matrices of shape $M \times K \times L$, while $B$ and $SFB$ are vectors of shape $K \times 1 \times L$, and 
 $C$ is a vector of shape $M \times 1 \times L$.
 
-That's the math. In memory,
+###  Representation in memory
+
 - `a`, `b`, `sfa`, `sfb` and `c` are Torch tensors, passed as CuTe tensor views / pointers.
 - `a` and `b` are of FP4 dtype, particularly [NVFP4](https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/), while `sfa` and `sfb` are of FP8 dtype. 
 - The tensors are in $K$-major order / row-major order.
 - `a` and `sfa` are given the shape `(m, k, l)` with strides `(k, 1, m * k)`, 
-while `b` and `sfb` are given the shape `(128, k, l)` with strides `(k, 1, 128 * k)`, `n` padded to 128 for easier tiling.
+while `b` and `sfb` are given the shape `(128, k, l)` with strides `(k, 1, 128 * k)`, 
+`n` padded to 128 for easier tiling.
 - `c` is of FP16 dtype and is given the shape `(m, 1, l)` with strides `(1, 1, l)`. 
   
 There are 3 shapes to target, `n` is always 1 since GEMV
@@ -413,7 +416,7 @@ The reference kernel implements
 - At the block level, different blocks (`bidx`) each take a chunk of 128 rows to compute.
 - Within each block, different threads (`tidx`) compute different rows within that 128-row chunk.
 
-####  Parallelism over $L$ (batch dimension):
+####  Parallelism over $L$ (batch dimension)
 - At the block level, different blocks along `bidz` handle different batch indices $l$.
 - Each block computes outputs for a single $l$, and many `bidz` blocks run in parallel.
 

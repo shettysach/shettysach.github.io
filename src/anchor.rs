@@ -56,6 +56,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
         };
 
         match self.inner.next()? {
+            // -- Code --
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
                 Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
@@ -71,6 +72,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                 Some(event)
             }
 
+            // -- Math
             Event::DisplayMath(latex) => {
                 let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
                 Some(Event::Html(CowStr::from(mathml)))
@@ -88,6 +90,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                 Some(Event::InlineHtml(CowStr::from(mathml)))
             }
 
+            // -- Anchor
             Event::Start(Tag::Heading {
                 level,
                 id,
@@ -129,13 +132,11 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                 }))
             }
 
-            Event::InlineHtml(CowStr::Borrowed("<!--toc:start-->\n"))
-            | Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
+            Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
                 CowStr::Borrowed("<details><summary>Contents</summary>"),
             )),
 
-            Event::InlineHtml(CowStr::Borrowed("<!--toc:end-->\n"))
-            | Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
+            Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
                 Some(Event::Html(CowStr::Borrowed("</details>")))
             }
 
