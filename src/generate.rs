@@ -40,7 +40,8 @@ fn render_markdown(
 
     writer.write_all(frontmatter.header(rel_url).as_bytes())?;
 
-    let parser = TextMergeStream::new(Parser::new_ext(&markdown, OPTIONS));
+    let parser = Parser::new_ext(&markdown, OPTIONS);
+    let parser = TextMergeStream::new(parser);
 
     if anchors {
         let parser = crate::anchor::AnchorIterator::new(parser);

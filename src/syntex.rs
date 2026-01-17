@@ -83,10 +83,10 @@ pub(crate) fn latex_to_mathml(
     Ok(mathml)
 }
 
-pub(crate) fn highlight_code(code: &str, syntax_tag: &str) -> Result<String> {
+pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
         .source(code)
-        .lang(match syntax_tag {
+        .lang(match tag {
             "rust" | "rs" => Language::Rust,
             "python" | "py" => Language::Python,
             "latex" | "tex" => Language::LaTeX,
