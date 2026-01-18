@@ -1,6 +1,7 @@
 ---
 title: Rendering math and highlighting code
 subtitle: How the blog renders math and highlights syntax, using static HTML and CSS
+date: 2025-06-05
 tags:
     - SSG
     - Blog

@@ -37,7 +37,7 @@
   --color-indigo-400: #2e7de9;
   --color-violet-400: #9854f1;
   --color-slate-200: #343b58;
-  --color-slate-300: #343b58;
+  --color-slate-300: #40434f;
   --color-slate-400: #40434f;
   --color-slate-600: #6c6e75;
   --color-slate-800: #343B58;
@@ -210,6 +210,16 @@ a, a code, a * {
 }
 
 a:hover { text-decoration: underline; }
+
+.article-date {
+  font-family: "Lora", serif;
+  font-style: italic;
+  color: var(--color-slate-300);
+}
+
+.article-title {
+  margin-bottom: 0;
+}
 
 img { max-width: 100%; }
 

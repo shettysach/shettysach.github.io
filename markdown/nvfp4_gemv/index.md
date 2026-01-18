@@ -1,6 +1,7 @@
 ---
 title: NVFP4 GEMV
-subtitle: My submission for the first round of the GPUMODE NVFP4 competition 
+subtitle: My submission for the first round of the GPUMODE NVFP4 competition
+date: 2026-01-10
 tags: [ CuTe DSL ]
 anchors: true
 ---

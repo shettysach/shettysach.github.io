@@ -103,7 +103,7 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     Ok(html)
 }
 
-pub(crate) fn process_metadata(mut parser: Parser) -> Option<Yaml> {
+pub(crate) fn process_metadata(parser: &mut Parser) -> Option<Yaml> {
     if let Some(Event::Start(Tag::MetadataBlock(MetadataBlockKind::YamlStyle))) = parser.next()
         && let Some(Event::Text(yaml)) = parser.next()
         && let Some(Event::End(TagEnd::MetadataBlock(MetadataBlockKind::YamlStyle))) = parser.next()

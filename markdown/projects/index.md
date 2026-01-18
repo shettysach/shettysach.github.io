@@ -1,6 +1,7 @@
 ---
 title: Projects
 subtitle: A post to display my personal projects
+date: 2025-01-20
 tags: [ About, Rust ]
 anchors: true
 ---
