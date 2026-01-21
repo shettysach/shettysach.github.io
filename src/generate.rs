@@ -88,9 +88,9 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                 continue;
             }
 
-            let date = date.unwrap_or_else(|| DateTime::<Utc>::from(modified));
+            let datetime = date.unwrap_or_else(|| DateTime::<Utc>::from(modified));
 
-            articles.push((frontmatter, date, rel_url.to_string()));
+            articles.push((frontmatter, datetime, rel_url.to_string()));
         } else if src_path.is_dir() {
             if !dst_path.exists() {
                 fs::create_dir(&dst_path)?;
@@ -105,8 +105,8 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 
     let (labels, entries) = articles
         .into_iter()
-        .map(|(frontmatter, date, url)| {
-            let label_rc = Rc::new(frontmatter.label(&url, &date));
+        .map(|(frontmatter, datetime, url)| {
+            let label_rc = Rc::new(frontmatter.label(&url, &datetime));
             let mut label = (*label_rc).clone();
 
             if let Some(tags) = frontmatter.tags {
@@ -125,16 +125,15 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                 }
             }
 
-            let label_li = format!("<li>{}</li>\n", label);
-
-            let entry = Entries {
-                title: frontmatter.title,
-                subtitle: frontmatter.subtitle,
-                datetime: date,
-                url,
-            };
-
-            (label_li, entry)
+            (
+                format!("<li>{label}</li>\n"),
+                Entries {
+                    title: frontmatter.title,
+                    subtitle: frontmatter.subtitle,
+                    datetime,
+                    url,
+                },
+            )
         })
         .unzip();
 
@@ -143,8 +142,9 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 
 pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
+    let mut parser = Parser::new_ext(&index_md, OPTIONS);
 
-    let (frontmatter, _, _) = process_metadata(&mut Parser::new_ext(&index_md, OPTIONS))
+    let (frontmatter, _, _) = process_metadata(&mut parser)
         .and_then(Frontmatter::parse_metadata)
         .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
 
@@ -153,7 +153,6 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     writer.write_all(frontmatter.header("").as_bytes())?;
 
-    let parser = Parser::new_ext(&index_md, OPTIONS);
     let processed = CustomIterator::new(parser);
     write_html_io(&mut writer, processed)?;
 

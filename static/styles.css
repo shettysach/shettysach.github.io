@@ -32,7 +32,7 @@
   --color-green-400: #c3e88d;
   --color-teal-300: #4fd6be;
   --color-cyan-200: #2e5857;
-  --color-sky-300: #2ac3de;
+  --color-sky-300: #188092;
   --color-sky-400: #003c97;
   --color-indigo-400: #2e7de9;
   --color-violet-400: #9854f1;
@@ -40,9 +40,9 @@
   --color-slate-300: #40434f;
   --color-slate-400: #40434f;
   --color-slate-600: #6c6e75;
-  --color-slate-800: #343B58;
-  --color-night-900: #ffffff;
-  --auxillary-bg: #f7f7ff;
+  --color-slate-800: #c4c8da;
+  --color-night-900: #f7f7ff;
+  --auxillary-bg: #eff3ff;
   }
 }
 
