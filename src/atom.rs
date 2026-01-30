@@ -10,7 +10,7 @@ pub(crate) struct Entries {
     pub(crate) title: String,
     pub(crate) subtitle: Option<String>,
     pub(crate) datetime: DateTime<Utc>,
-    pub(crate) url: String,
+    pub(crate) rel_url: String,
 }
 
 pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()> {
@@ -63,7 +63,7 @@ pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()>
         title,
         subtitle,
         datetime,
-        url,
+        rel_url,
     } in entries
     {
         writer.write_event(Event::Start(BytesStart::new("entry")))?;
@@ -74,7 +74,7 @@ pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()>
         writer.write_event(Event::End(BytesEnd::new("title")))?;
 
         // id - use url
-        let url = format!("https://shettysach.github.io/{}", url);
+        let url = format!("https://shettysach.github.io/{}", rel_url);
         writer.write_event(Event::Start(BytesStart::new("id")))?;
         writer.write_event(Event::Text(BytesText::new(&url)))?;
         writer.write_event(Event::End(BytesEnd::new("id")))?;
@@ -155,12 +155,15 @@ pub(crate) fn generate_sitemap(entries: Vec<Entries>, path: &Path) -> Result<()>
         writer.write_event(Event::End(BytesEnd::new("url")))?;
     }
 
-    for Entries { url, datetime, .. } in entries {
+    for Entries {
+        rel_url, datetime, ..
+    } in entries
+    {
         writer.write_event(Event::Start(BytesStart::new("url")))?;
 
         // loc
         writer.write_event(Event::Start(BytesStart::new("loc")))?;
-        let full_url = format!("https://shettysach.github.io/{}", url);
+        let full_url = format!("https://shettysach.github.io/{}", rel_url);
         writer.write_event(Event::Text(BytesText::new(&full_url)))?;
         writer.write_event(Event::End(BytesEnd::new("loc")))?;
 

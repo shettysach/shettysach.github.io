@@ -4,7 +4,7 @@ use crate::{
     syntex::{CustomIterator, OPTIONS, process_metadata},
 };
 use anyhow::{Context, Result, anyhow};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use std::{
     collections::HashMap,
@@ -25,7 +25,7 @@ fn render_markdown(
     dst: &Path,
     modified: SystemTime,
     rel_url: &str,
-) -> Result<(Frontmatter, Option<DateTime<Utc>>)> {
+) -> Result<(Frontmatter, Option<NaiveDate>)> {
     let markdown = fs::read_to_string(src)?;
     let mut parser = Parser::new_ext(&markdown, OPTIONS);
 
@@ -88,7 +88,10 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                 continue;
             }
 
-            let datetime = date.unwrap_or_else(|| DateTime::<Utc>::from(modified));
+            let datetime = date.map_or_else(
+                || DateTime::<Utc>::from(modified),
+                |nd| nd.and_hms_opt(0, 0, 0).unwrap().and_utc(),
+            );
 
             articles.push((frontmatter, datetime, rel_url.to_string()));
         } else if src_path.is_dir() {
@@ -105,8 +108,8 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
 
     let (labels, entries) = articles
         .into_iter()
-        .map(|(frontmatter, datetime, url)| {
-            let label_rc = Rc::new(frontmatter.label(&url, &datetime));
+        .map(|(frontmatter, datetime, rel_url)| {
+            let label_rc = Rc::new(frontmatter.label(&rel_url, &datetime));
             let mut label = (*label_rc).clone();
 
             if let Some(tags) = frontmatter.tags {
@@ -115,7 +118,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                 let links = tags
                     .iter()
                     .map(|tag| format!("<a href=\"tags.html#{tag}\">{tag}</a>"))
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<String>>() // allocates Vec, then String
                     .join(", ");
 
                 label.push_str(&links);
@@ -131,7 +134,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                     title: frontmatter.title,
                     subtitle: frontmatter.subtitle,
                     datetime,
-                    url,
+                    rel_url,
                 },
             )
         })
@@ -269,7 +272,7 @@ impl Frontmatter {
         label
     }
 
-    fn parse_metadata(doc: Yaml) -> Option<(Frontmatter, Option<DateTime<Utc>>, bool)> {
+    fn parse_metadata(doc: Yaml) -> Option<(Frontmatter, Option<NaiveDate>, bool)> {
         let title = doc["title"].as_str()?.to_string();
         let subtitle = doc["subtitle"].as_str().map(str::to_string);
         let tags = doc["tags"]
@@ -277,11 +280,9 @@ impl Frontmatter {
             .and_then(|vec| vec.iter().map(|v| v.as_str().map(str::to_string)).collect());
         let draft = doc["draft"].as_bool().unwrap_or(false);
         let anchors = doc["anchors"].as_bool().unwrap_or(false);
-        let date = doc["date"].as_str().and_then(|s| {
-            chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .ok()
-                .map(|nd| nd.and_hms_opt(0, 0, 0).unwrap().and_utc())
-        });
+        let date = doc["date"]
+            .as_str()
+            .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
         Some((
             Frontmatter {
