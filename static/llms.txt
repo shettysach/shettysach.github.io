@@ -29,12 +29,12 @@ For eg - The source of `https://shettysach.github.io/index.html`, can be found a
 https://shettysach.github.io/index.html -> index.html 
 ```
 
-- Remove the `.html` extension, and add `.md` 
+- Remove the `.html` extension, and add the `.md` extension. 
 ```
 index.html -> index.md 
 ```
 
-- Append to `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/` and request
+- Append to `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/` and request.
 ```
 index.md -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/index.md 
 ```
@@ -42,5 +42,5 @@ index.md -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/re
 The same applies to pages within subdirectories, eg -
 
 ```
- https://shettysach.github.io/02_projects/projects.html -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/02_projects/projects.md 
+ https://shettysach.github.io/projects/index.html -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/projects/index.md 
 ```
