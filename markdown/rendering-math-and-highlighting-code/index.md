@@ -240,5 +240,3 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     Ok(html)
 }
 ```
-
----

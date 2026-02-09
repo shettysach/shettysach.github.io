@@ -99,7 +99,7 @@ There are 3 shapes to target, `n` is always 1 since GEMV
 
 ## CuTe DSL
 
-[CuTe DSL](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl.html) 
+[CuTe DSL](https://docs.nvidia.com/cutlass/latest/media/docs/pythonDSL/cute_dsl.html) 
 for Python is a high‑level, Python front end over NVIDIA’s CUTLASS/CuTe tensor core infrastructure 
 that lets you describe GPU kernels in terms of tiled tensors, layouts, and copy/compute primitives, and also low-level optimizations when needed. 
 The tiling abstraction seems to be the direction kernel frameworks are headed, and since there was a template file using the DSL, 
@@ -871,6 +871,6 @@ for helping me get started with CuTe and the problem, and for learning about way
 I'd also like to thank GPUMODE and NVIDIA for organizing the competition.
 
 This was my first submission to a kernel optimization contest and my first work log.
-You can find my submission at the [leaderboard page](https://www.gpumode.com/v2/leaderboard/595?tab=rankings) 
+You can find my submission at the [leaderboard page](https://www.gpumode.com/leaderboard/595?tab=rankings) 
 under the name swanbomb_ (25.989μs). I would recommend checking out the faster CuTe solutions to see their approaches too.
 Thank you for reading.
