@@ -1,6 +1,7 @@
 use crate::syntex::{highlight_code, latex_to_mathml};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
+use std::mem::take;
 
 type HeadingType<'a> = (
     Vec<Event<'a>>,
@@ -19,7 +20,7 @@ pub(crate) enum HeadingCapture<'a> {
 }
 
 pub(crate) enum Emit<'a> {
-    AnchorOpen(Vec<Event<'a>>, HeadingLevel, Box<str>),
+    AnchorOpen(Vec<Event<'a>>, HeadingLevel, String),
     Content(Vec<Event<'a>>, HeadingLevel),
     AnchorClose(HeadingLevel),
 }
@@ -47,17 +48,15 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let HeadingCapture::Emitting(_) = &mut self.heading
-            && let HeadingCapture::Emitting(emit) = std::mem::take(&mut self.heading)
+            && let HeadingCapture::Emitting(emit) = take(&mut self.heading)
         {
-            match emit {
+            Some(match emit {
                 Emit::AnchorOpen(mut events, level, id) => {
                     events.reverse();
                     self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
-                    Some(Event::Html(CowStr::Boxed(
-                        format!("<a href=\"#{}\">", id).into(),
-                    )))
+                    Event::Html(format!("<a href=\"#{}\">", id).into())
                 }
-                Emit::Content(mut events, level) => Some(match events.pop() {
+                Emit::Content(mut events, level) => match events.pop() {
                     Some(Event::InlineMath(ref latex)) => {
                         let mathml =
                             latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
@@ -72,9 +71,9 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                         self.heading = HeadingCapture::Emitting(Emit::AnchorClose(level));
                         Event::End(TagEnd::Link)
                     }
-                }),
-                Emit::AnchorClose(level) => Some(Event::End(TagEnd::Heading(level))),
-            }
+                },
+                Emit::AnchorClose(level) => Event::End(TagEnd::Heading(level)),
+            })
         } else {
             match self.inner.next()? {
                 // -- Code --
@@ -83,34 +82,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                     Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
                 }
 
-                Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                    let highlighted = highlight_code(&code, lang).ok()?;
-                    Some(Event::Html(CowStr::from(highlighted)))
-                }
-
-                event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
-                    self.code = None;
-                    Some(event)
-                }
+                Event::Text(code) if let Some(lang) = take(&mut self.code) => Some(Event::Html(
+                    CowStr::from(highlight_code(&code, &lang).ok()?),
+                )),
 
                 // -- Math
-                Event::DisplayMath(latex) => {
-                    let mathml =
-                        latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
-                    Some(Event::Html(CowStr::from(mathml)))
-                }
+                Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
+                    latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?,
+                ))),
 
-                event @ Event::InlineMath(_)
-                    if let HeadingCapture::Capturing(ref mut head) = self.heading =>
-                {
-                    head.0.push(event);
-                    self.next()
-                }
-
-                Event::InlineMath(ref latex) => {
-                    let mathml =
-                        latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
-                    Some(Event::InlineHtml(CowStr::from(mathml)))
+                Event::InlineMath(latex) if let HeadingCapture::Inactive = self.heading => {
+                    Some(Event::InlineHtml(CowStr::from(
+                        latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?,
+                    )))
                 }
 
                 // -- Anchor
@@ -132,28 +116,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
                 Event::End(TagEnd::Heading(_level))
                     if let HeadingCapture::Capturing((h_events, level, id, classes, attrs)) =
-                        std::mem::take(&mut self.heading) =>
+                        take(&mut self.heading) =>
                 {
-                    let id: Box<str> = id.map(|s| s.into_string().into()).unwrap_or_else(|| {
-                        let header_text = h_events
-                            .iter()
-                            .filter_map(|event| match event {
-                                Event::Text(s)
-                                | Event::Code(s)
-                                | Event::InlineMath(s)
-                                | Event::InlineHtml(s) => Some(s.as_ref()),
-                                _ => None,
-                            })
-                            .collect::<String>();
-                        slugify(&header_text).into()
-                    });
+                    let id: String = id
+                        .map(|s| s.into_string())
+                        .unwrap_or_else(|| slugify(&h_events));
 
                     self.heading =
                         HeadingCapture::Emitting(Emit::AnchorOpen(h_events, level, id.clone()));
 
                     Some(Event::Start(Tag::Heading {
                         level,
-                        id: Some(CowStr::Boxed(id)),
+                        id: Some(id.into()),
                         classes,
                         attrs,
                     }))
@@ -180,20 +154,28 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
 // Slugger
 
-fn slugify(s: &str) -> String {
+fn slugify(h_events: &[Event]) -> String {
     let mut last_dash = true;
-    let iter = s.chars();
 
-    iter.filter_map(|c| {
-        if c.is_alphanumeric() {
-            last_dash = false;
-            Some(c.to_ascii_lowercase())
-        } else if (c.is_whitespace() || c == '-') && !last_dash {
-            last_dash = true;
-            Some('-')
-        } else {
-            None
-        }
-    })
-    .collect()
+    h_events
+        .iter()
+        .filter_map(|event| match event {
+            Event::Text(s) | Event::Code(s) | Event::InlineMath(s) | Event::InlineHtml(s) => Some(
+                s.chars()
+                    .filter_map(|c| {
+                        if c.is_alphanumeric() {
+                            last_dash = false;
+                            Some(c.to_ascii_lowercase())
+                        } else if (c.is_whitespace() || c == '-') && !last_dash {
+                            last_dash = true;
+                            Some('-')
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<String>(),
+            ),
+            _ => None,
+        })
+        .collect::<String>()
 }
