@@ -13,9 +13,15 @@ type HeadingType<'a> = (
 #[derive(Default)]
 pub(crate) enum HeadingCapture<'a> {
     Capturing(HeadingType<'a>),
-    Emitting(Vec<Event<'a>>, HeadingLevel),
+    Emitting(Emit<'a>),
     #[default]
     Inactive,
+}
+
+pub(crate) enum Emit<'a> {
+    AnchorOpen(Vec<Event<'a>>, HeadingLevel, Box<str>),
+    Content(Vec<Event<'a>>, HeadingLevel),
+    AnchorClose(HeadingLevel),
 }
 
 pub(crate) struct AnchorIterator<'a, I: Iterator<Item = Event<'a>>> {
@@ -40,112 +46,134 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let HeadingCapture::Emitting(ref mut h_events, level) = self.heading {
-            return Some(match h_events.pop() {
-                Some(Event::InlineMath(ref latex)) => {
+        if let HeadingCapture::Emitting(_) = &mut self.heading
+            && let HeadingCapture::Emitting(emit) = std::mem::take(&mut self.heading)
+        {
+            match emit {
+                Emit::AnchorOpen(mut events, level, id) => {
+                    events.reverse();
+                    self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
+                    Some(Event::Html(CowStr::Boxed(
+                        format!("<a href=\"#{}\">", id).into(),
+                    )))
+                }
+                Emit::Content(mut events, level) => Some(match events.pop() {
+                    Some(Event::InlineMath(ref latex)) => {
+                        let mathml =
+                            latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
+                        self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
+                        Event::InlineHtml(CowStr::from(mathml))
+                    }
+                    Some(event) => {
+                        self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
+                        event
+                    }
+                    None => {
+                        self.heading = HeadingCapture::Emitting(Emit::AnchorClose(level));
+                        Event::End(TagEnd::Link)
+                    }
+                }),
+                Emit::AnchorClose(level) => Some(Event::End(TagEnd::Heading(level))),
+            }
+        } else {
+            match self.inner.next()? {
+                // -- Code --
+                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
+                    self.code = Some(lang);
+                    Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
+                }
+
+                Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                    let highlighted = highlight_code(&code, lang).ok()?;
+                    Some(Event::Html(CowStr::from(highlighted)))
+                }
+
+                event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                    self.code = None;
+                    Some(event)
+                }
+
+                // -- Math
+                Event::DisplayMath(latex) => {
+                    let mathml =
+                        latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
+                    Some(Event::Html(CowStr::from(mathml)))
+                }
+
+                event @ Event::InlineMath(_)
+                    if let HeadingCapture::Capturing(ref mut head) = self.heading =>
+                {
+                    head.0.push(event);
+                    self.next()
+                }
+
+                Event::InlineMath(ref latex) => {
                     let mathml =
                         latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
-                    Event::InlineHtml(CowStr::from(mathml))
+                    Some(Event::InlineHtml(CowStr::from(mathml)))
                 }
-                Some(event) => event,
-                None => {
-                    self.heading = HeadingCapture::Inactive;
-                    Event::End(TagEnd::Heading(level))
-                }
-            });
-        };
 
-        match self.inner.next()? {
-            // -- Code --
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                self.code = Some(lang);
-                Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
-            }
-
-            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                let highlighted = highlight_code(&code, lang).ok()?;
-                Some(Event::Html(CowStr::from(highlighted)))
-            }
-
-            event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
-                self.code = None;
-                Some(event)
-            }
-
-            // -- Math
-            Event::DisplayMath(latex) => {
-                let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
-                Some(Event::Html(CowStr::from(mathml)))
-            }
-
-            event @ Event::InlineMath(_)
-                if let HeadingCapture::Capturing(ref mut head) = self.heading =>
-            {
-                head.0.push(event);
-                self.next()
-            }
-
-            Event::InlineMath(ref latex) => {
-                let mathml = latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
-                Some(Event::InlineHtml(CowStr::from(mathml)))
-            }
-
-            // -- Anchor
-            Event::Start(Tag::Heading {
-                level,
-                id,
-                classes,
-                attrs,
-            }) => {
-                self.heading =
-                    HeadingCapture::Capturing((Vec::with_capacity(1), level, id, classes, attrs));
-                self.next()
-            }
-
-            Event::End(TagEnd::Heading(_level))
-                if let HeadingCapture::Capturing((mut h_events, level, id, classes, attrs)) =
-                    std::mem::take(&mut self.heading) =>
-            {
-                let id = id.or_else(|| {
-                    let header_text = h_events
-                        .iter()
-                        .filter_map(|event| match event {
-                            Event::Text(s)
-                            | Event::Code(s)
-                            | Event::InlineMath(s)
-                            | Event::InlineHtml(s) => Some(s.as_ref()),
-                            _ => None,
-                        })
-                        .collect::<String>();
-                    Some(CowStr::Boxed(slugify(&header_text).into()))
-                });
-
-                h_events.reverse();
-
-                self.heading = HeadingCapture::Emitting(h_events, level);
-
-                Some(Event::Start(Tag::Heading {
+                // -- Anchor
+                Event::Start(Tag::Heading {
                     level,
                     id,
                     classes,
                     attrs,
-                }))
+                }) => {
+                    self.heading = HeadingCapture::Capturing((
+                        Vec::with_capacity(1),
+                        level,
+                        id,
+                        classes,
+                        attrs,
+                    ));
+                    self.next()
+                }
+
+                Event::End(TagEnd::Heading(_level))
+                    if let HeadingCapture::Capturing((h_events, level, id, classes, attrs)) =
+                        std::mem::take(&mut self.heading) =>
+                {
+                    let id: Box<str> = id.map(|s| s.into_string().into()).unwrap_or_else(|| {
+                        let header_text = h_events
+                            .iter()
+                            .filter_map(|event| match event {
+                                Event::Text(s)
+                                | Event::Code(s)
+                                | Event::InlineMath(s)
+                                | Event::InlineHtml(s) => Some(s.as_ref()),
+                                _ => None,
+                            })
+                            .collect::<String>();
+                        slugify(&header_text).into()
+                    });
+
+                    self.heading =
+                        HeadingCapture::Emitting(Emit::AnchorOpen(h_events, level, id.clone()));
+
+                    Some(Event::Start(Tag::Heading {
+                        level,
+                        id: Some(CowStr::Boxed(id)),
+                        classes,
+                        attrs,
+                    }))
+                }
+
+                Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
+                    CowStr::Borrowed("<details><summary>Contents</summary>"),
+                )),
+
+                Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
+                    Some(Event::Html(CowStr::Borrowed("</details>")))
+                }
+
+                event if let HeadingCapture::Capturing(ref mut head) = self.heading => {
+                    head.0.push(event);
+                    self.next()
+                }
+
+                event => Some(event),
             }
-
-            Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
-                CowStr::Borrowed("<details><summary>Contents</summary>"),
-            )),
-
-            Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
-                Some(Event::Html(CowStr::Borrowed("</details>")))
-            }
-
-            event if let HeadingCapture::Capturing(ref mut head) = self.heading => {
-                head.0.push(event);
-                self.next()
-            }
-
-            event => Some(event),
         }
     }
 }

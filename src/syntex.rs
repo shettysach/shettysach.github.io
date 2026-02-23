@@ -38,27 +38,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
             }
 
-            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                let highlighted = highlight_code(&code, lang).ok()?;
+            Event::Text(code) if let Some(lang) = std::mem::take(&mut self.code) => {
+                let highlighted = highlight_code(&code, &lang).ok()?;
                 Some(Event::Html(CowStr::from(highlighted)))
             }
 
-            event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
-                self.code = None;
-                Some(event)
-            }
-
             // -- Math
-            Event::DisplayMath(latex) => {
-                let mathml = latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?;
-                Some(Event::Html(CowStr::from(mathml)))
-            }
+            Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
+                latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?,
+            ))),
 
-            Event::InlineMath(latex) => {
-                let mathml =
-                    latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?;
-                Some(Event::InlineHtml(CowStr::from(mathml)))
-            }
+            Event::InlineMath(latex) => Some(Event::InlineHtml(CowStr::from(
+                latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?,
+            ))),
 
             event => Some(event),
         }
