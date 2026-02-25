@@ -1,7 +1,6 @@
 use crate::syntex::{highlight_code, latex_to_mathml};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
-use std::mem::take;
 
 type HeadingType<'a> = (
     Vec<Event<'a>>,
@@ -48,7 +47,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let HeadingCapture::Emitting(_) = &mut self.heading
-            && let HeadingCapture::Emitting(emit) = take(&mut self.heading)
+            && let HeadingCapture::Emitting(emit) = std::mem::take(&mut self.heading)
         {
             Some(match emit {
                 Emit::AnchorOpen(mut events, level, id) => {
@@ -79,12 +78,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                 // -- Code --
                 Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                     self.code = Some(lang);
-                    Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
+                    self.next()
                 }
 
-                Event::Text(code) if let Some(lang) = take(&mut self.code) => Some(Event::Html(
-                    CowStr::from(highlight_code(&code, &lang).ok()?),
-                )),
+                Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                    let highlighted = highlight_code(&code, lang).ok()?;
+                    Some(Event::Html(CowStr::from(highlighted)))
+                }
+
+                Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                    self.code = None;
+                    self.next()
+                }
 
                 // -- Math
                 Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
@@ -116,7 +121,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
                 Event::End(TagEnd::Heading(_level))
                     if let HeadingCapture::Capturing((h_events, level, id, classes, attrs)) =
-                        take(&mut self.heading) =>
+                        std::mem::take(&mut self.heading) =>
                 {
                     let id: String = id
                         .map(|s| s.into_string())

@@ -58,7 +58,7 @@ $$
 
 ### LaTeX
 
-LaTeX is a high-quality typesetting system; it includes features designed for the production of technical and scientific documentation. LaTeX is the de facto standard for the communication and publication of scientific documents. LaTeX is available as free software. From [The Latex Project](https://www.latex-project.org/).
+LaTeX is a high-quality typesetting system; it includes features designed for the production of technical and scientific documentation. LaTeX is the de facto standard for the communication and publication of scientific documents. LaTeX is available as free software. [^1]
 
 LaTeX representation of the above equation:
 ```latex
@@ -70,8 +70,7 @@ However, web browsers and standard HTML cannot directly interpret LaTeX syntax. 
 ### MathML
 
 Mathematical Markup Language (MathML) is an XML-based language for describing mathematical notation.
-MathML Core is a subset with increased implementation details based on rules from LaTeX and the Open Font Format. It is tailored for browsers and designed specifically to work well with other web standards including HTML, CSS, DOM, JavaScript.
-From the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/MathML).
+MathML Core is a subset with increased implementation details based on rules from LaTeX and the Open Font Format. It is tailored for browsers and designed specifically to work well with other web standards including HTML, CSS, DOM, JavaScript. [^2]
 
 MathML representation of the above equation:
 ```html
@@ -240,3 +239,8 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     Ok(html)
 }
 ```
+
+---
+
+[^1]: From [The LaTeX Project](https://www.latex-project.org/).
+[^2]: From the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/MathML).

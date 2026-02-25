@@ -20,7 +20,7 @@ use yaml_rust2::Yaml;
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
 
-fn render_markdown(
+fn generate_article(
     src: &Path,
     dst: &Path,
     modified: SystemTime,
@@ -81,7 +81,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
             let rel_html = rel_path.with_extension("html");
             let rel_url = rel_html.to_str().with_context(|| "Path not UTF8")?;
 
-            let (frontmatter, date) = render_markdown(src_path, &dst_html, modified, rel_url)?;
+            let (frontmatter, date) = generate_article(src_path, &dst_html, modified, rel_url)?;
 
             // Page will be rendered, but unlisted
             if frontmatter.draft {

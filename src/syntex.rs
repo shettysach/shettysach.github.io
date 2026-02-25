@@ -1,5 +1,5 @@
 use anyhow::Result;
-use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
+use lumis::{HtmlLinkedBuilder, languages::Language};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Parser, Tag, TagEnd,
 };
@@ -9,7 +9,8 @@ use yaml_rust2::{Yaml, YamlLoader};
 pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(Options::ENABLE_MATH)
-    .union(Options::ENABLE_HEADING_ATTRIBUTES);
+    .union(Options::ENABLE_HEADING_ATTRIBUTES)
+    .union(Options::ENABLE_FOOTNOTES);
 
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
@@ -35,12 +36,18 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
             // -- Code --
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
-                Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
+                self.next()
             }
 
-            Event::Text(code) if let Some(lang) = std::mem::take(&mut self.code) => Some(
-                Event::Html(CowStr::from(highlight_code(&code, &lang).ok()?)),
-            ),
+            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
+                let highlighted = highlight_code(&code, lang).ok()?;
+                Some(Event::Html(CowStr::from(highlighted)))
+            }
+
+            Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+                self.code = None;
+                self.next()
+            }
 
             // -- Math
             Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
@@ -76,7 +83,6 @@ pub(crate) fn latex_to_mathml(
 
 pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
-        .source(code)
         .lang(match tag {
             "rust" | "rs" => Language::Rust,
             "python" | "py" => Language::Python,
@@ -87,11 +93,7 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
         .pre_class(None)
         .build()?;
 
-    let mut output = Vec::new();
-    formatter.highlights(&mut output)?;
-    let html = String::from_utf8(output)?;
-
-    Ok(html)
+    Ok(lumis::highlight(code, formatter))
 }
 
 pub(crate) fn process_metadata(parser: &mut Parser) -> Option<Yaml> {

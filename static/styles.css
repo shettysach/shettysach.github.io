@@ -251,34 +251,22 @@ ol ul {
 }
 
 ul,
-ul ul ul {
-    list-style-type: disc;
-}
+ul ul ul { list-style-type: disc; }
 ul ul,
-ul ul ul ul {
-    list-style-type: square;
-}
+ul ul ul ul { list-style-type: square; }
 
-li {
-    padding-left: 0.5rem;
-}
+li { padding-left: 0.5rem; }
 
-a:hover {
-    text-decoration: underline;
-}
+a:hover { text-decoration: underline; }
 
 .article-date {
     font-family: "Lora", serif;
     font-style: italic;
 }
 
-.article-title {
-    margin-bottom: 0;
-}
+.article-title { margin-bottom: 0; }
 
-img {
-    max-width: 100%;
-}
+img { max-width: 100%; }
 
 hr {
     color: var(--color-indigo-400);
@@ -298,9 +286,16 @@ header nav ul {
     gap: 2rem;
 }
 
-header nav ul li {
-    display: inline;
+header nav ul li { display: inline; }
+
+.footnote-definition {
+    margin: 1rem 0;
+    padding-left: 1rem;
 }
+
+.footnote-definition-label { color: var(--color-sky-400); }
+
+.footnote-definition p { display: inline; }
 
 @media (max-width: 768px) {
     header,
@@ -315,11 +310,5 @@ header nav ul li {
     header,
     footer {
         padding: 1rem 1rem;
-    }
-
-    math {
-        font-size: 100%;
-        max-width: 100%;
-        margin-left: 0;
     }
 }
