@@ -8,6 +8,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use std::{
     collections::HashMap,
+    fmt::Write as _,
     fs,
     io::{BufWriter, Write},
     path::Path,
@@ -65,11 +66,12 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
     let mut articles = Vec::with_capacity(est_count);
     let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(est_count * 2);
 
+    let index_path = markdown_dir.join("index.md");
     for entry in WalkDir::new(markdown_dir)
         .max_depth(2)
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|e| e.path() != markdown_dir.join("index.md"))
+        .filter(|e| e.path() != index_path)
     {
         let src_path = entry.path();
         let rel_path = src_path.strip_prefix(markdown_dir)?;
@@ -109,19 +111,22 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
     let (labels, entries) = articles
         .into_iter()
         .map(|(frontmatter, datetime, rel_url)| {
-            let label_rc = Rc::new(frontmatter.label(&rel_url, &datetime));
-            let mut label = (*label_rc).clone();
+            let base = frontmatter.label(&rel_url, &datetime);
+            let label_rc = Rc::new(base);
+            let mut label = String::with_capacity(label_rc.len() + 64);
+            label.push_str(&label_rc);
 
             if let Some(tags) = frontmatter.tags {
                 label.push_str(" │ ");
 
-                let links = tags
-                    .iter()
-                    .map(|tag| format!("<a href=\"tags.html#{tag}\">{tag}</a>"))
-                    .collect::<Vec<String>>() // allocates Vec, then String
-                    .join(", ");
-
-                label.push_str(&links);
+                let mut first = true;
+                for tag in &tags {
+                    if !first {
+                        label.push_str(", ");
+                    }
+                    first = false;
+                    write!(label, "<a href=\"tags.html#{tag}\">{tag}</a>").unwrap();
+                }
 
                 for tag in tags {
                     tags_map.entry(tag).or_default().push(label_rc.clone());
@@ -243,7 +248,7 @@ impl Frontmatter {
         let tags = &self
             .tags
             .as_ref()
-            .map(|tags| tags.join(", ")) // NOTE: Use CoW? negligible?
+            .map(|tags| tags.join(", "))
             .unwrap_or_else(|| "blog, blogpost, article".to_string());
 
         HEADER
