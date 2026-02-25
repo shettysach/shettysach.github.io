@@ -243,4 +243,5 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
 ---
 
 [^1]: From [The LaTeX Project](https://www.latex-project.org/).
+
 [^2]: From the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/MathML).

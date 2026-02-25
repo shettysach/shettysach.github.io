@@ -288,11 +288,6 @@ header nav ul {
 
 header nav ul li { display: inline; }
 
-.footnote-definition {
-    margin: 1rem 0;
-    padding-left: 1rem;
-}
-
 .footnote-definition-label { color: var(--color-sky-400); }
 
 .footnote-definition p { display: inline; }
