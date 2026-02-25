@@ -290,7 +290,7 @@ header nav ul li { display: inline; }
 
 .footnote-definition-label { color: var(--color-sky-400); }
 
-.footnote-definition p { display: inline; }
+.footnote-definition > p:first-of-type { display: inline; }
 
 @media (max-width: 768px) {
     header,

@@ -2,19 +2,20 @@ use crate::syntex::{highlight_code, latex_to_mathml};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
 
-#[derive(Default)]
-pub(crate) enum HeadingCapture<'a> {
-    Capturing(Vec<Event<'a>>, HeadingLevel, Option<CowStr<'a>>),
-    Emitting(Vec<Event<'a>>, HeadingLevel),
-    #[default]
-    Inactive,
-}
-
 pub(crate) struct AnchorIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
     code: Option<CowStr<'a>>,
-    heading: HeadingCapture<'a>,
+    footnote: Option<CowStr<'a>>,
+    heading: Head<'a>,
+}
+
+#[derive(Default)]
+pub(crate) enum Head<'a> {
+    #[default]
+    Inactive,
+    Capturing(Vec<Event<'a>>, HeadingLevel, Option<CowStr<'a>>),
+    Emitting(Vec<Event<'a>>, HeadingLevel),
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> AnchorIterator<'a, I> {
@@ -23,7 +24,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> AnchorIterator<'a, I> {
             inner,
             storage: Storage::new(),
             code: None,
-            heading: HeadingCapture::Inactive,
+            footnote: None,
+            heading: Head::Inactive,
         }
     }
 }
@@ -32,7 +34,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let HeadingCapture::Emitting(h_events, h_level) = &mut self.heading {
+        if let Head::Emitting(h_events, h_level) = &mut self.heading {
             Some(match h_events.pop() {
                 Some(Event::InlineMath(ref latex)) => Event::InlineHtml(CowStr::from(
                     latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?,
@@ -41,8 +43,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                 Some(event) => event,
 
                 None => {
-                    let event = Event::Html(CowStr::from(format!("</a></{}>", h_level)));
-                    self.heading = HeadingCapture::Inactive;
+                    let event = Event::Html(CowStr::from(format!("</a></{h_level}>")));
+                    self.heading = Head::Inactive;
                     event
                 }
             })
@@ -64,12 +66,12 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                     self.next()
                 }
 
-                // -- Math
+                // -- Math --
                 Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
                     latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?,
                 ))),
 
-                Event::InlineMath(latex) if let HeadingCapture::Inactive = self.heading => {
+                Event::InlineMath(latex) if let Head::Inactive = self.heading => {
                     Some(Event::InlineHtml(CowStr::from(
                         latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?,
                     )))
@@ -77,12 +79,12 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
                 // -- Anchor
                 Event::Start(Tag::Heading { level, id, .. }) => {
-                    self.heading = HeadingCapture::Capturing(Vec::with_capacity(1), level, id);
+                    self.heading = Head::Capturing(Vec::with_capacity(1), level, id);
                     self.next()
                 }
 
                 Event::End(TagEnd::Heading(_level))
-                    if let HeadingCapture::Capturing(mut h_events, h_level, id) =
+                    if let Head::Capturing(mut h_events, h_level, id) =
                         std::mem::take(&mut self.heading) =>
                 {
                     let id: String = id
@@ -90,11 +92,10 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                         .unwrap_or_else(|| slugify(&h_events));
 
                     h_events.reverse();
-                    self.heading = HeadingCapture::Emitting(h_events, h_level);
+                    self.heading = Head::Emitting(h_events, h_level);
 
                     Some(Event::Html(CowStr::from(format!(
-                        "<{} id=\"{}\"><a href=\"#{}\">",
-                        h_level, id, id
+                        "<{h_level} id=\"{id}\"><a href=\"#{id}\">"
                     ))))
                 }
 
@@ -107,7 +108,23 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                     Some(Event::Html(CowStr::Borrowed("</details>")))
                 }
 
-                event if let HeadingCapture::Capturing(ref mut h_events, ..) = self.heading => {
+                // -- Footnotes --
+                Event::FootnoteReference(name) => Some(Event::InlineHtml(CowStr::from(format!(
+                    "<sup class=\"footnote-reference\" id=\"fr-{name}\"><a href=\"#{name}\">{name}</a></sup>"
+                )))),
+
+                Event::Start(Tag::FootnoteDefinition(name)) => {
+                    self.footnote = Some(name.clone());
+                    Some(Event::Start(Tag::FootnoteDefinition(name)))
+                }
+
+                Event::End(TagEnd::FootnoteDefinition) if let Some(name) = self.footnote.take() => {
+                    Some(Event::Html(CowStr::from(format!(
+                        " <a href=\"#fr-{name}\">↩</a></div>\n"
+                    ))))
+                }
+
+                event if let Head::Capturing(ref mut h_events, ..) = self.heading => {
                     h_events.push(event);
                     self.next()
                 }

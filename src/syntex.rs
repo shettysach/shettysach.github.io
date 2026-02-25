@@ -16,6 +16,7 @@ pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
     code: Option<CowStr<'a>>,
+    footnote: Option<CowStr<'a>>,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
@@ -24,6 +25,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
             inner,
             storage: Storage::new(),
             code: None,
+            footnote: None,
         }
     }
 }
@@ -48,7 +50,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 self.next()
             }
 
-            // -- Math
+            // -- Math --
             Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
                 latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?,
             ))),
@@ -56,6 +58,22 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
             Event::InlineMath(latex) => Some(Event::InlineHtml(CowStr::from(
                 latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?,
             ))),
+
+            // -- Footnotes --
+            Event::FootnoteReference(name) => Some(Event::InlineHtml(CowStr::from(format!(
+                "<sup class=\"footnote-reference\" id=\"fr-{name}\"><a href=\"#{name}\">{name}</a></sup>"
+            )))),
+
+            Event::Start(Tag::FootnoteDefinition(name)) => {
+                self.footnote = Some(name.clone());
+                Some(Event::Start(Tag::FootnoteDefinition(name)))
+            }
+
+            Event::End(TagEnd::FootnoteDefinition) if let Some(name) = self.footnote.take() => {
+                Some(Event::Html(CowStr::from(format!(
+                    " <a href=\"#fr-{name}\">↩</a></div>\n"
+                ))))
+            }
 
             event => Some(event),
         }
@@ -89,7 +107,6 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
             "html" => Language::HTML,
             _ => Language::PlainText,
         })
-        .pre_class(None)
         .build()?;
 
     Ok(lumis::highlight(code, formatter))

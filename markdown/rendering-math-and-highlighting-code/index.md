@@ -151,9 +151,9 @@ fn sum_of_cubes_rhs(n: usize) -> usize {
 }
 ```
 
-### Autumnus and Tree-sitter
+### Lumis and Tree-sitter
 
-For syntax highlighting, the blog uses the [`autumnus`](https://crates.io/crates/autumnus) crate,
+For syntax highlighting, the blog uses the [`lumis`](https://crates.io/crates/lumis)[^3] crate,
 which uses [`tree-sitter`](https://github.com/tree-sitter/tree-sitter) under the hood.
 Tree-sitter powers the highlighting in editors such as
 [Neovim](https://neovim.io/doc/user/treesitter.html) and [Zed](https://zed.dev/blog/syntax-aware-editing).
@@ -214,7 +214,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 }
 ```
 
-Code highlighting with `autumnus`
+Code highlighting with `lumis` [^3]
 
 ```rust
 use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
@@ -245,3 +245,5 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
 [^1]: From [The LaTeX Project](https://www.latex-project.org/).
 
 [^2]: From the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/MathML).
+
+[^3]: Formerly known as [Autumnus](https://crates.io/crates/autumnus).
