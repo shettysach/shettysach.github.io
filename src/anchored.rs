@@ -2,7 +2,7 @@ use crate::syntex::{highlight_code, latex_to_mathml};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
 
-pub(crate) struct AnchorIterator<'a, I: Iterator<Item = Event<'a>>> {
+pub(crate) struct AnchoredIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
     storage: Storage,
     code: Option<CowStr<'a>>,
@@ -18,7 +18,7 @@ pub(crate) enum Head<'a> {
     Emitting(Vec<Event<'a>>, HeadingLevel),
 }
 
-impl<'a, I: Iterator<Item = Event<'a>>> AnchorIterator<'a, I> {
+impl<'a, I: Iterator<Item = Event<'a>>> AnchoredIterator<'a, I> {
     pub(crate) fn new(inner: I) -> Self {
         Self {
             inner,
@@ -30,7 +30,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> AnchorIterator<'a, I> {
     }
 }
 
-impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
+impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -77,7 +77,32 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                     )))
                 }
 
-                // -- Anchor
+                // -- Footnotes --
+                Event::FootnoteReference(name) => Some(Event::InlineHtml(CowStr::from(format!(
+                    "<sup class=\"footnote-reference\" id=\"fr-{name}\"><a href=\"#{name}\">{name}</a></sup>"
+                )))),
+
+                Event::Start(Tag::FootnoteDefinition(name)) => {
+                    self.footnote = Some(name.clone());
+                    Some(Event::Start(Tag::FootnoteDefinition(name)))
+                }
+
+                Event::End(TagEnd::FootnoteDefinition) if let Some(name) = self.footnote.take() => {
+                    Some(Event::Html(CowStr::from(format!(
+                        " <a href=\"#fr-{name}\">↩</a></div>\n"
+                    ))))
+                }
+
+                // -- Table of Contents
+                Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
+                    CowStr::Borrowed("<details><summary>Contents</summary>"),
+                )),
+
+                Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
+                    Some(Event::Html(CowStr::Borrowed("</details>")))
+                }
+
+                // -- Anchors
                 Event::Start(Tag::Heading { level, id, .. }) => {
                     self.heading = Head::Capturing(Vec::with_capacity(1), level, id);
                     self.next()
@@ -96,31 +121,6 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
 
                     Some(Event::Html(CowStr::from(format!(
                         "<{h_level} id=\"{id}\"><a href=\"#{id}\">"
-                    ))))
-                }
-
-                // -- Table of Contents
-                Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
-                    CowStr::Borrowed("<details><summary>Contents</summary>"),
-                )),
-
-                Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
-                    Some(Event::Html(CowStr::Borrowed("</details>")))
-                }
-
-                // -- Footnotes --
-                Event::FootnoteReference(name) => Some(Event::InlineHtml(CowStr::from(format!(
-                    "<sup class=\"footnote-reference\" id=\"fr-{name}\"><a href=\"#{name}\">{name}</a></sup>"
-                )))),
-
-                Event::Start(Tag::FootnoteDefinition(name)) => {
-                    self.footnote = Some(name.clone());
-                    Some(Event::Start(Tag::FootnoteDefinition(name)))
-                }
-
-                Event::End(TagEnd::FootnoteDefinition) if let Some(name) = self.footnote.take() => {
-                    Some(Event::Html(CowStr::from(format!(
-                        " <a href=\"#fr-{name}\">↩</a></div>\n"
                     ))))
                 }
 

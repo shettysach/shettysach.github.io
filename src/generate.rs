@@ -1,5 +1,5 @@
 use crate::{
-    anchor::AnchorIterator,
+    anchored::AnchoredIterator,
     atom::{Entries, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
 };
@@ -44,7 +44,7 @@ fn generate_article(
 
     let parser = TextMergeStream::new(parser);
     if anchors {
-        let parser = AnchorIterator::new(parser);
+        let parser = AnchoredIterator::new(parser);
         write_html_io(&mut writer, parser)?;
     } else {
         let parser = CustomIterator::new(parser);

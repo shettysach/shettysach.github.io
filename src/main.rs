@@ -1,6 +1,6 @@
 #![feature(if_let_guard)]
 
-mod anchor;
+mod anchored;
 mod atom;
 mod generate;
 mod syntex;
