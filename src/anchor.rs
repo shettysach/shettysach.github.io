@@ -2,26 +2,12 @@ use crate::syntex::{highlight_code, latex_to_mathml};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
 
-type HeadingType<'a> = (
-    Vec<Event<'a>>,
-    HeadingLevel,
-    Option<CowStr<'a>>,
-    Vec<CowStr<'a>>,
-    Vec<(CowStr<'a>, Option<CowStr<'a>>)>,
-);
-
 #[derive(Default)]
 pub(crate) enum HeadingCapture<'a> {
-    Capturing(HeadingType<'a>),
-    Emitting(Emit<'a>),
+    Capturing(Vec<Event<'a>>, HeadingLevel, Option<CowStr<'a>>),
+    Emitting(Vec<Event<'a>>, HeadingLevel),
     #[default]
     Inactive,
-}
-
-pub(crate) enum Emit<'a> {
-    AnchorOpen(Vec<Event<'a>>, HeadingLevel, String),
-    Content(Vec<Event<'a>>, HeadingLevel),
-    AnchorClose(HeadingLevel),
 }
 
 pub(crate) struct AnchorIterator<'a, I: Iterator<Item = Event<'a>>> {
@@ -46,32 +32,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let HeadingCapture::Emitting(_) = &mut self.heading
-            && let HeadingCapture::Emitting(emit) = std::mem::take(&mut self.heading)
-        {
-            Some(match emit {
-                Emit::AnchorOpen(mut events, level, id) => {
-                    events.reverse();
-                    self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
-                    Event::Html(format!("<a href=\"#{}\">", id).into())
+        if let HeadingCapture::Emitting(h_events, h_level) = &mut self.heading {
+            Some(match h_events.pop() {
+                Some(Event::InlineMath(ref latex)) => Event::InlineHtml(CowStr::from(
+                    latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?,
+                )),
+
+                Some(event) => event,
+
+                None => {
+                    let event = Event::Html(CowStr::from(format!("</a></{}>", h_level)));
+                    self.heading = HeadingCapture::Inactive;
+                    event
                 }
-                Emit::Content(mut events, level) => match events.pop() {
-                    Some(Event::InlineMath(ref latex)) => {
-                        let mathml =
-                            latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).ok()?;
-                        self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
-                        Event::InlineHtml(CowStr::from(mathml))
-                    }
-                    Some(event) => {
-                        self.heading = HeadingCapture::Emitting(Emit::Content(events, level));
-                        event
-                    }
-                    None => {
-                        self.heading = HeadingCapture::Emitting(Emit::AnchorClose(level));
-                        Event::End(TagEnd::Link)
-                    }
-                },
-                Emit::AnchorClose(level) => Event::End(TagEnd::Heading(level)),
             })
         } else {
             match self.inner.next()? {
@@ -103,41 +76,29 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                 }
 
                 // -- Anchor
-                Event::Start(Tag::Heading {
-                    level,
-                    id,
-                    classes,
-                    attrs,
-                }) => {
-                    self.heading = HeadingCapture::Capturing((
-                        Vec::with_capacity(1),
-                        level,
-                        id,
-                        classes,
-                        attrs,
-                    ));
+                Event::Start(Tag::Heading { level, id, .. }) => {
+                    self.heading = HeadingCapture::Capturing(Vec::with_capacity(1), level, id);
                     self.next()
                 }
 
                 Event::End(TagEnd::Heading(_level))
-                    if let HeadingCapture::Capturing((h_events, level, id, classes, attrs)) =
+                    if let HeadingCapture::Capturing(mut h_events, h_level, id) =
                         std::mem::take(&mut self.heading) =>
                 {
                     let id: String = id
                         .map(|s| s.into_string())
                         .unwrap_or_else(|| slugify(&h_events));
 
-                    self.heading =
-                        HeadingCapture::Emitting(Emit::AnchorOpen(h_events, level, id.clone()));
+                    h_events.reverse();
+                    self.heading = HeadingCapture::Emitting(h_events, h_level);
 
-                    Some(Event::Start(Tag::Heading {
-                        level,
-                        id: Some(id.into()),
-                        classes,
-                        attrs,
-                    }))
+                    Some(Event::Html(CowStr::from(format!(
+                        "<{} id=\"{}\"><a href=\"#{}\">",
+                        h_level, id, id
+                    ))))
                 }
 
+                // -- Table of Contents
                 Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
                     CowStr::Borrowed("<details><summary>Contents</summary>"),
                 )),
@@ -146,8 +107,8 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchorIterator<'a, I> {
                     Some(Event::Html(CowStr::Borrowed("</details>")))
                 }
 
-                event if let HeadingCapture::Capturing(ref mut head) = self.heading => {
-                    head.0.push(event);
+                event if let HeadingCapture::Capturing(ref mut h_events, ..) = self.heading => {
+                    h_events.push(event);
                     self.next()
                 }
 

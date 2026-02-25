@@ -21,7 +21,7 @@ Here are some of my personal projects. For more detail read this [article](./pro
 - [Termfolio](Termfolio) - Terminal shell style interactive portfolio website
 - [Cohle](https://www.github.com/shettysach/cohle) - Rust CLI that prints Rust Cohle quotes
 - [Liquid-Oxygen](https://www.github.com/shettysach/Liquid-Oxygen) - Tree-walk interpreter for Lox written in Haskell
-- [This website](https://www.github.com/shettysach/shettysach.github.io) - This is my personal website, which uses [pulldown_cmark](https://crates.io/crates/pulldown-cmark), [pulldown_latex](https://crates.io/crates/pulldown-latex) and [autumnus](https://crates.io/crates/autumnus) to generate static content from Markdown.
+- [This website](https://www.github.com/shettysach/shettysach.github.io) - SSG that uses Markdown to generate static content
 
 ## Links
 

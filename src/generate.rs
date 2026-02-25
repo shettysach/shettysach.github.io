@@ -156,8 +156,8 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     writer.write_all(frontmatter.header("").as_bytes())?;
 
-    let processed = CustomIterator::new(parser);
-    write_html_io(&mut writer, processed)?;
+    // let parser = CustomIterator::new(parser);
+    write_html_io(&mut writer, parser)?;
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;

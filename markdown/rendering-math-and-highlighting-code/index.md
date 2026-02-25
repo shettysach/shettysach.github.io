@@ -191,19 +191,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.next()? {
+            // -- Code --
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
                 self.code = Some(lang);
-                Some(Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))
+                self.next()
             }
 
             Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                let highlighted = highlight_code(&code, lang).ok()?;
-                Some(Event::Html(CowStr::from(highlighted)))
+                Some(Event::Html(CowStr::from(highlight_code(&code, lang).ok()?)))
             }
 
-            event @ Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
+            Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
                 self.code = None;
-                Some(event)
+                self.next()
             }
 
             // ..

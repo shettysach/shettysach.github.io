@@ -40,8 +40,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
             }
 
             Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                let highlighted = highlight_code(&code, lang).ok()?;
-                Some(Event::Html(CowStr::from(highlighted)))
+                Some(Event::Html(CowStr::from(highlight_code(&code, lang).ok()?)))
             }
 
             Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
