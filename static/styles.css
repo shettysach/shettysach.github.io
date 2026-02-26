@@ -195,6 +195,26 @@ h6 a * {
     color: inherit;
 }
 
+h1 a,
+h2 a,
+h3 a,
+h4 a,
+h5 a,
+h6 a {
+    position: relative;
+}
+
+/* h1 a::after, */
+/* h2 a::after, */
+/* h3 a::after, */
+/* h4 a::after, */
+/* h5 a::after, */
+/* h6 a::after { */
+/*     content: "§"; */
+/*     color: var(--color-slate-800); */
+/*     padding-left: 0.3rem; */
+/* } */
+
 h1 a:hover,
 h2 a:hover,
 h3 a:hover,
@@ -264,7 +284,14 @@ a:hover { text-decoration: underline; }
     font-style: italic;
 }
 
-.article-title { margin-bottom: 0; }
+.article-title {
+    margin-bottom: 0;
+    color: var(--color-indigo-400);
+}
+
+.article-title:hover { text-decoration: underline; }
+.article-title a::before { content: none; }
+.article-title a::after { content: none; }
 
 img { max-width: 100%; }
 

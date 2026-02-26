@@ -2,7 +2,7 @@
 title: NVFP4 GEMV
 subtitle: My submission for the first round of the GPUMODE NVFP4 competition
 date: 2026-01-10
-tags: [ CuTe DSL ]
+tags: [ GPU Kernels, Optimization, CuTe DSL, CUDA ]
 anchors: true
 ---
 
@@ -56,7 +56,9 @@ C[x, 0] = \sum_{y=0}^{K-1} A[x,y]\;B[y, 0]
 $$
 
 - GEMV stands for **GE**neral **M**atrix–**V**ector multiplication.
-- $x$ is the index for the row dimension and $y$ is the index for the column dimension.
+- $x$ is the index for the row dimension of $A$ and $C$. 
+The reduction happens along $y$, which is the index of 
+the column dimension of $A$ and the row dimension of $B$.
 - We multiply a matrix $A$ of shape $M \times K$ by a vector $B$ of shape $K \times 1$ 
 to produce another vector $C$ of shape $M \times 1$.
 
