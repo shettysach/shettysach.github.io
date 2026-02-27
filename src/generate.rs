@@ -3,16 +3,14 @@ use crate::{
     atom::{Entries, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
 };
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use std::{
     collections::HashMap,
-    fmt::Write as _,
     fs,
     io::{BufWriter, Write},
     path::Path,
-    rc::Rc,
     time::SystemTime,
 };
 use walkdir::WalkDir;
@@ -58,13 +56,10 @@ fn generate_article(
     Ok((frontmatter, date))
 }
 
-// TODO: OPTIMIZE THIS
-type C = (Vec<String>, Vec<Entries>, HashMap<String, Vec<Rc<String>>>);
+type C = (Vec<Entries>, Vec<String>, HashMap<String, Vec<usize>>);
 pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
-    let est_count = WalkDir::new(markdown_dir).max_depth(1).into_iter().count() - 1;
-
-    let mut articles = Vec::with_capacity(est_count);
-    let mut tags_map: HashMap<String, Vec<Rc<String>>> = HashMap::with_capacity(est_count * 2);
+    let mut articles = Vec::new();
+    let mut tags_map: HashMap<String, Vec<usize>> = HashMap::new();
 
     let index_path = markdown_dir.join("index.md");
     for entry in WalkDir::new(markdown_dir)
@@ -80,12 +75,14 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
         if src_path.extension().is_some_and(|ext| ext == "md") {
             let dst_html = dst_path.with_extension("html");
             let modified = src_path.metadata()?.modified()?;
-            let rel_html = rel_path.with_extension("html");
-            let rel_url = rel_html.to_str().with_context(|| "Path not UTF8")?;
+            let rel_url = rel_path
+                .with_extension("html")
+                .into_os_string()
+                .into_string()
+                .map_err(|_| anyhow!("Path not UTF8"))?;
 
-            let (frontmatter, date) = generate_article(src_path, &dst_html, modified, rel_url)?;
+            let (frontmatter, date) = generate_article(src_path, &dst_html, modified, &rel_url)?;
 
-            // Page will be rendered, but unlisted
             if frontmatter.draft {
                 continue;
             }
@@ -95,7 +92,7 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                 |nd| nd.and_hms_opt(0, 0, 0).unwrap().and_utc(),
             );
 
-            articles.push((frontmatter, datetime, rel_url.to_string()));
+            articles.push((frontmatter, datetime, rel_url));
         } else if src_path.is_dir() {
             if !dst_path.exists() {
                 fs::create_dir(&dst_path)?;
@@ -108,44 +105,48 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
     // Sort by date, newest first
     articles.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let (labels, entries) = articles
+    let (entries, labels): (Vec<_>, Vec<_>) = articles
         .into_iter()
-        .map(|(frontmatter, datetime, rel_url)| {
-            let base = frontmatter.label(&rel_url, &datetime);
-            let label_rc = Rc::new(base);
-            let mut label = String::with_capacity(label_rc.len() + 64);
-            label.push_str(&label_rc);
+        .enumerate()
+        .map(|(idx, (frontmatter, datetime, rel_url))| {
+            let mut label = frontmatter.label(&rel_url, &datetime);
 
-            if let Some(tags) = frontmatter.tags {
+            if let Some(ref tags) = frontmatter.tags {
                 label.push_str(" │ ");
 
                 let mut first = true;
-                for tag in &tags {
+                for tag in tags {
                     if !first {
                         label.push_str(", ");
                     }
                     first = false;
-                    write!(label, "<a href=\"tags.html#{tag}\">{tag}</a>").unwrap();
+                    label.push_str("<a href=\"tags.html#");
+                    label.push_str(tag);
+                    label.push_str("\">");
+                    label.push_str(tag);
+                    label.push_str("</a>");
                 }
+            }
 
+            if let Some(tags) = frontmatter.tags {
                 for tag in tags {
-                    tags_map.entry(tag).or_default().push(label_rc.clone());
+                    tags_map.entry(tag).or_default().push(idx);
                 }
             }
 
             (
-                format!("<li>{label}</li>\n"),
                 Entries {
                     title: frontmatter.title,
                     subtitle: frontmatter.subtitle,
                     datetime,
                     rel_url,
                 },
+                label,
             )
         })
         .unzip();
 
-    Ok((labels, entries, tags_map))
+    Ok((entries, labels, tags_map))
 }
 
 pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
@@ -167,17 +168,17 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    let (article_labels, atom_entries, tags_map) = collect_articles(markdown_dir, html_dir)?;
+    let (atom_entries, labels, tags_map) = collect_articles(markdown_dir, html_dir)?;
 
-    generate_articles_page(article_labels, html_dir)?;
-    generate_tags_page(tags_map, &html_dir.join("tags.html"))?;
+    generate_articles_page(&labels, html_dir)?;
+    generate_tags_page(&labels, tags_map, &html_dir.join("tags.html"))?;
     generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
     generate_sitemap(atom_entries, &html_dir.join("sitemap.xml"))?;
 
     Ok(())
 }
 
-pub(crate) fn generate_articles_page(labels: Vec<String>, html_dir: &Path) -> Result<()> {
+pub(crate) fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
     let file = fs::File::create(html_dir.join("articles.html"))?;
     let mut writer = BufWriter::new(file);
 
@@ -192,7 +193,9 @@ pub(crate) fn generate_articles_page(labels: Vec<String>, html_dir: &Path) -> Re
 
     writer.write_all(b"<ul>\n")?;
     for label in labels {
+        writer.write_all(b"<li>")?;
         writer.write_all(label.as_bytes())?;
+        writer.write_all(b"</li>\n")?;
     }
     writer.write_all(b"</ul>\n")?;
     writer.write_all(FOOTER.as_bytes())?;
@@ -201,7 +204,11 @@ pub(crate) fn generate_articles_page(labels: Vec<String>, html_dir: &Path) -> Re
     Ok(())
 }
 
-fn generate_tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Path) -> Result<()> {
+fn generate_tags_page(
+    labels: &[String],
+    tags_map: HashMap<String, Vec<usize>>,
+    tags_path: &Path,
+) -> Result<()> {
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
@@ -217,14 +224,18 @@ fn generate_tags_page(tags_map: HashMap<String, Vec<Rc<String>>>, tags_path: &Pa
     writer.write_all("<h1>Tags</h1><hr>".as_bytes())?;
 
     for tag in tags {
-        let labels = &tags_map[tag];
-        writer.write_all(
-            format!("<br><details><summary id=\"{tag}\">{tag}</summary>\n").as_bytes(),
-        )?;
+        let indices = &tags_map[tag];
+        writer.write_all(b"<br><details><summary id=\"")?;
+        writer.write_all(tag.as_bytes())?;
+        writer.write_all(b"\">")?;
+        writer.write_all(tag.as_bytes())?;
+        writer.write_all(b"</summary>\n")?;
 
         writer.write_all(b"<ul>\n")?;
-        for label in labels {
-            writer.write_all(format!("<li>{}</li>\n", label).as_bytes())?;
+        for &idx in indices {
+            writer.write_all(b"<li>")?;
+            writer.write_all(labels[idx].as_bytes())?;
+            writer.write_all(b"</li>\n")?;
         }
         writer.write_all(b"</ul>\n</details>\n")?;
     }
@@ -251,6 +262,8 @@ impl Frontmatter {
             .map(|tags| tags.join(", "))
             .unwrap_or_else(|| "blog, blogpost, article".to_string());
 
+        // NOTE: performs 4 allocs, negligible
+        // or better to use templating engine ?
         HEADER
             .replace("{{TITLE}}", &self.title)
             .replace("{{DESCRIPTION}}", description)
@@ -269,10 +282,9 @@ impl Frontmatter {
             label.push_str("<br>");
         }
 
-        label.push_str(&format!(
-            "<small class=\"article-date\">{}</small>",
-            date.format("%B %d, %Y")
-        ));
+        label.push_str("<small class=\"article-date\">");
+        label.push_str(&date.format("%B %d, %Y").to_string());
+        label.push_str("</small>");
 
         label
     }

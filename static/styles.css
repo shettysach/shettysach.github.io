@@ -128,7 +128,6 @@ section {
     margin-bottom: 2rem;
 }
 
-
 p code,
 span code,
 li code {
@@ -159,13 +158,11 @@ code {
     font-family: "JetBrains Mono", monospace;
 }
 
-
 pre code {
     color: var(--color-slate-200);
     white-space: pre;
     display: block;
 }
-
 
 /* details ul,  */
 h1,
@@ -271,13 +268,21 @@ ol ul {
 }
 
 ul,
-ul ul ul { list-style-type: disc; }
+ul ul ul {
+    list-style-type: disc;
+}
 ul ul,
-ul ul ul ul { list-style-type: square; }
+ul ul ul ul {
+    list-style-type: square;
+}
 
-li { padding-left: 0.5rem; }
+li {
+    padding-left: 0.5rem;
+}
 
-a:hover { text-decoration: underline; }
+a:hover {
+    text-decoration: underline;
+}
 
 .article-date {
     font-family: "Lora", serif;
@@ -289,11 +294,19 @@ a:hover { text-decoration: underline; }
     color: var(--color-indigo-400);
 }
 
-.article-title:hover { text-decoration: underline; }
-.article-title a::before { content: none; }
-.article-title a::after { content: none; }
+.article-title:hover {
+    text-decoration: underline;
+}
+.article-title a::before {
+    content: none;
+}
+.article-title a::after {
+    content: none;
+}
 
-img { max-width: 100%; }
+img {
+    max-width: 100%;
+}
 
 hr {
     color: var(--color-indigo-400);
@@ -313,11 +326,17 @@ header nav ul {
     gap: 2rem;
 }
 
-header nav ul li { display: inline; }
+header nav ul li {
+    display: inline;
+}
 
-.footnote-definition-label { color: var(--color-sky-400); }
+.footnote-definition-label {
+    color: var(--color-sky-400);
+}
 
-.footnote-definition > p:first-of-type { display: inline; }
+.footnote-definition > p:first-of-type {
+    display: inline;
+}
 
 @media (max-width: 768px) {
     header,
