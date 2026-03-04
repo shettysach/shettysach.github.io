@@ -330,6 +330,14 @@ header nav ul li {
     display: inline;
 }
 
+.footnote-definition:first-of-type {
+    margin-top: 1rem;
+}
+
+.footnote-definition:last-of-type {
+    margin-bottom: 1rem;
+}
+
 .footnote-definition-label {
     color: var(--color-sky-400);
 }

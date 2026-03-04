@@ -6,14 +6,14 @@ use quick_xml::{
 };
 use std::{fs, path::Path};
 
-pub(crate) struct Entries {
+pub(crate) struct Entry {
     pub(crate) title: String,
     pub(crate) subtitle: Option<String>,
     pub(crate) datetime: DateTime<Utc>,
     pub(crate) rel_url: String,
 }
 
-pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()> {
+pub(crate) fn generate_atom_feed(entries: &[Entry], path: &Path) -> Result<()> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
     writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
@@ -59,7 +59,7 @@ pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()>
     writer.write_event(Event::End(BytesEnd::new("updated")))?;
 
     // entries
-    for Entries {
+    for Entry {
         title,
         subtitle,
         datetime,
@@ -107,7 +107,7 @@ pub(crate) fn generate_atom_feed(entries: &[Entries], path: &Path) -> Result<()>
     Ok(())
 }
 
-pub(crate) fn generate_sitemap(entries: Vec<Entries>, path: &Path) -> Result<()> {
+pub(crate) fn generate_sitemap(entries: Vec<Entry>, path: &Path) -> Result<()> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
     writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
@@ -155,7 +155,7 @@ pub(crate) fn generate_sitemap(entries: Vec<Entries>, path: &Path) -> Result<()>
         writer.write_event(Event::End(BytesEnd::new("url")))?;
     }
 
-    for Entries {
+    for Entry {
         rel_url, datetime, ..
     } in entries
     {

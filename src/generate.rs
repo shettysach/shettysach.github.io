@@ -1,6 +1,6 @@
 use crate::{
     anchored::AnchoredIterator,
-    atom::{Entries, generate_atom_feed, generate_sitemap},
+    atom::{Entry, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
 };
 use anyhow::{Result, anyhow};
@@ -19,45 +19,43 @@ use yaml_rust2::Yaml;
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
 
-fn generate_article(
-    src: &Path,
-    dst: &Path,
-    modified: SystemTime,
-    rel_url: &str,
-) -> Result<(Frontmatter, Option<NaiveDate>)> {
-    let markdown = fs::read_to_string(src)?;
-    let mut parser = Parser::new_ext(&markdown, OPTIONS);
+pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
+    generate_index(markdown_dir, html_dir)?;
 
-    let (frontmatter, date, anchors) = process_metadata(&mut parser)
+    let (atom_entries, labels, tags_map) = collect_articles(markdown_dir, html_dir)?;
+
+    generate_articles_page(&labels, html_dir)?;
+    generate_tags_page(&labels, tags_map, &html_dir.join("tags.html"))?;
+    generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
+    generate_sitemap(atom_entries, &html_dir.join("sitemap.xml"))?;
+
+    Ok(())
+}
+
+fn generate_index(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
+    let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
+    let mut parser = Parser::new_ext(&index_md, OPTIONS);
+
+    let (frontmatter, _, _) = process_metadata(&mut parser)
         .and_then(Frontmatter::parse_metadata)
-        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
+        .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
 
-    if dst.exists() && dst.metadata()?.modified()? > modified {
-        return Ok((frontmatter, date));
-    }
-
-    let file = fs::File::create(dst)?;
+    let file = fs::File::create(html_dir.join("index.html"))?;
     let mut writer = BufWriter::new(file);
 
-    writer.write_all(frontmatter.header(rel_url).as_bytes())?;
+    writer.write_all(frontmatter.generate_header("").as_bytes())?;
 
-    let parser = TextMergeStream::new(parser);
-    if anchors {
-        let parser = AnchoredIterator::new(parser);
-        write_html_io(&mut writer, parser)?;
-    } else {
-        let parser = CustomIterator::new(parser);
-        write_html_io(&mut writer, parser)?;
-    }
+    // let parser = CustomIterator::new(parser);
+    write_html_io(&mut writer, parser)?;
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    Ok((frontmatter, date))
+    Ok(())
 }
 
-type C = (Vec<Entries>, Vec<String>, HashMap<String, Vec<usize>>);
-pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
+type C = (Vec<Entry>, Vec<String>, HashMap<String, Vec<usize>>);
+fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
     let mut articles = Vec::new();
     let mut tags_map: HashMap<String, Vec<usize>> = HashMap::new();
 
@@ -105,13 +103,13 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
     // Sort by date, newest first
     articles.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let (entries, labels): (Vec<_>, Vec<_>) = articles
+    let (entries, labels): (Vec<Entry>, Vec<String>) = articles
         .into_iter()
         .enumerate()
         .map(|(idx, (frontmatter, datetime, rel_url))| {
             let mut label = frontmatter.label(&rel_url, &datetime);
 
-            if let Some(ref tags) = frontmatter.tags {
+            if let Some(tags) = frontmatter.tags {
                 label.push_str(" │ ");
 
                 let mut first = true;
@@ -121,21 +119,17 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
                     }
                     first = false;
                     label.push_str("<a href=\"tags.html#");
-                    label.push_str(tag);
+                    label.push_str(&tag);
                     label.push_str("\">");
-                    label.push_str(tag);
+                    label.push_str(&tag);
                     label.push_str("</a>");
-                }
-            }
 
-            if let Some(tags) = frontmatter.tags {
-                for tag in tags {
                     tags_map.entry(tag).or_default().push(idx);
                 }
             }
 
             (
-                Entries {
+                Entry {
                     title: frontmatter.title,
                     subtitle: frontmatter.subtitle,
                     datetime,
@@ -149,44 +143,53 @@ pub(crate) fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C
     Ok((entries, labels, tags_map))
 }
 
-pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
-    let index_md = fs::read_to_string(markdown_dir.join("index.md"))?;
-    let mut parser = Parser::new_ext(&index_md, OPTIONS);
+fn generate_article(
+    src: &Path,
+    dst: &Path,
+    modified: SystemTime,
+    rel_url: &str,
+) -> Result<(Frontmatter, Option<NaiveDate>)> {
+    let markdown = fs::read_to_string(src)?;
+    let mut parser = Parser::new_ext(&markdown, OPTIONS);
 
-    let (frontmatter, _, _) = process_metadata(&mut parser)
+    let (frontmatter, date, anchors) = process_metadata(&mut parser)
         .and_then(Frontmatter::parse_metadata)
-        .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
+        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
 
-    let file = fs::File::create(html_dir.join("index.html"))?;
+    if dst.exists() && dst.metadata()?.modified()? > modified {
+        return Ok((frontmatter, date));
+    }
+
+    let file = fs::File::create(dst)?;
     let mut writer = BufWriter::new(file);
 
-    writer.write_all(frontmatter.header("").as_bytes())?;
+    writer.write_all(frontmatter.generate_header(rel_url).as_bytes())?;
 
-    // let parser = CustomIterator::new(parser);
-    write_html_io(&mut writer, parser)?;
+    let parser = TextMergeStream::new(parser);
+    if anchors {
+        let parser = AnchoredIterator::new(parser);
+        write_html_io(&mut writer, parser)?;
+    } else {
+        let parser = CustomIterator::new(parser);
+        write_html_io(&mut writer, parser)?;
+    }
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    let (atom_entries, labels, tags_map) = collect_articles(markdown_dir, html_dir)?;
-
-    generate_articles_page(&labels, html_dir)?;
-    generate_tags_page(&labels, tags_map, &html_dir.join("tags.html"))?;
-    generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
-    generate_sitemap(atom_entries, &html_dir.join("sitemap.xml"))?;
-
-    Ok(())
+    Ok((frontmatter, date))
 }
 
-pub(crate) fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
+fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
     let file = fs::File::create(html_dir.join("articles.html"))?;
     let mut writer = BufWriter::new(file);
 
-    let header_str = HEADER
-        .replace("{{TITLE}}", "Articles")
-        .replace("{{DESCRIPTION}}", "List of all articles")
-        .replace("{{TAGS}}", "blog, blogpost, articles")
-        .replace("{{URL}}", "articles.html");
+    let header_str = generate_header(
+        "Articles",
+        "List of all articles",
+        "blog, blogpost, articles",
+        "articles.html",
+    );
 
     writer.write_all(header_str.as_bytes())?;
     writer.write_all("<h1>Articles</h1><hr>".as_bytes())?;
@@ -215,11 +218,12 @@ fn generate_tags_page(
     let file = fs::File::create(tags_path)?;
     let mut writer = BufWriter::new(file);
 
-    let header_str = HEADER
-        .replace("{{TITLE}}", "Tags")
-        .replace("{{DESCRIPTION}}", "Page for tags and tagged articles")
-        .replace("{{TAGS}}", "blog, blogpost, tags")
-        .replace("{{URL}}", "tags.html");
+    let header_str = generate_header(
+        "Tags",
+        "Page for tags and tagged articles",
+        "blog, blogpost, tags",
+        "tags.html",
+    );
     writer.write_all(header_str.as_bytes())?;
     writer.write_all("<h1>Tags</h1><hr>".as_bytes())?;
 
@@ -246,6 +250,16 @@ fn generate_tags_page(
     Ok(())
 }
 
+fn generate_header(title: &str, description: &str, tags: &str, url: &str) -> String {
+    // NOTE: performs 4 allocs, negligible
+    // or better to use templating engine ?
+    HEADER
+        .replace("{{TITLE}}", title)
+        .replace("{{DESCRIPTION}}", description)
+        .replace("{{TAGS}}", tags)
+        .replace("{{URL}}", url)
+}
+
 pub(crate) struct Frontmatter {
     pub(crate) title: String,
     pub(crate) subtitle: Option<String>,
@@ -254,7 +268,7 @@ pub(crate) struct Frontmatter {
 }
 
 impl Frontmatter {
-    fn header(&self, url: &str) -> String {
+    fn generate_header(&self, url: &str) -> String {
         let description = self.subtitle.as_deref().unwrap_or("Blogpost");
         let tags = &self
             .tags
@@ -262,13 +276,7 @@ impl Frontmatter {
             .map(|tags| tags.join(", "))
             .unwrap_or_else(|| "blog, blogpost, article".to_string());
 
-        // NOTE: performs 4 allocs, negligible
-        // or better to use templating engine ?
-        HEADER
-            .replace("{{TITLE}}", &self.title)
-            .replace("{{DESCRIPTION}}", description)
-            .replace("{{TAGS}}", tags)
-            .replace("{{URL}}", url)
+        generate_header(&self.title, description, tags, url)
     }
 
     fn label(&self, link: &str, date: &DateTime<Utc>) -> String {

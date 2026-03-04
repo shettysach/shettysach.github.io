@@ -29,7 +29,7 @@ These are some of my personal projects.
 [GitHub](https://github.com/shettysach/loxi),
 [Wasm playground](https://shettysach.github.io/Loxi)
 
-![loxi](./loxi.png)
+![loxi](https://raw.githubusercontent.com/shettysach/loxi/refs/heads/main/LOXI.png)
 
 - Bytecode interpreter for [the Lox language](https://craftinginterpreters.com/the-lox-language.html) with a mark and sweep garbage collector, based on the second half of [Crafting Interpreters by Robert Nystorm](https://craftinginterpreters.com/)
 - Extended with lists and native functions for native functions for list operations
@@ -168,7 +168,12 @@ __   _____  /\ \ \_   _ _ __ ___
 [GitHub](https://github.com/shettysach/Termfolio),
 [Page](https://shettysach.github.io/Termfolio)
 
-![ss](./term.png)
+<img 
+  src="https://raw.githubusercontent.com/shettysach/Termfolio/refs/heads/master/screenshot.png" 
+  width="1200" 
+  height="600" 
+  style="object-fit: cover; object-position: top;"
+/>
 
 - Terminal style portfolio website, built using the Leptos framework for Rust WASM
 - Customizable and configurable using JSON
