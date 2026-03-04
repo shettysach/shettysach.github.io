@@ -117,6 +117,10 @@ details[open] summary:before {
     content: "▼";
 }
 
+.toc {
+    font-family: "Lora", serif;
+}
+
 footer {
     background: var(--auxillary-bg);
     color: var(--color-slate-200);

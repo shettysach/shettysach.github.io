@@ -95,7 +95,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
 
                 // -- Table of Contents
                 Event::Html(CowStr::Borrowed("<!--toc:start-->\n")) => Some(Event::Html(
-                    CowStr::Borrowed("<details><summary>Contents</summary>"),
+                    CowStr::Borrowed("<details class=\"toc\"><summary>Contents</summary>"),
                 )),
 
                 Event::Html(CowStr::Borrowed("<!--toc:end-->\n")) => {
