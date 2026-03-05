@@ -10,6 +10,7 @@ pub(crate) const OPTIONS: Options = Options::empty()
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(Options::ENABLE_MATH)
     .union(Options::ENABLE_HEADING_ATTRIBUTES)
+    .union(Options::ENABLE_TABLES)
     .union(Options::ENABLE_FOOTNOTES);
 
 pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {

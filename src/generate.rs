@@ -25,7 +25,7 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     let (atom_entries, labels, tags_map) = collect_articles(markdown_dir, html_dir)?;
 
     generate_articles_page(&labels, html_dir)?;
-    generate_tags_page(&labels, tags_map, &html_dir.join("tags.html"))?;
+    generate_tags_page(&labels, tags_map, html_dir)?;
     generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
     generate_sitemap(atom_entries, &html_dir.join("sitemap.xml"))?;
 
@@ -118,9 +118,9 @@ fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
                         label.push_str(", ");
                     }
                     first = false;
-                    label.push_str("<a href=\"tags.html#");
+                    label.push_str("<a href=\"");
                     label.push_str(&tag);
-                    label.push_str("\">");
+                    label.push_str(".html\">");
                     label.push_str(&tag);
                     label.push_str("</a>");
 
@@ -210,12 +210,12 @@ fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
 fn generate_tags_page(
     labels: &[String],
     tags_map: HashMap<String, Vec<usize>>,
-    tags_path: &Path,
+    html_dir: &Path,
 ) -> Result<()> {
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
-    let file = fs::File::create(tags_path)?;
+    let file = fs::File::create(html_dir.join("tags.html"))?;
     let mut writer = BufWriter::new(file);
 
     let header_str = generate_header(
@@ -225,15 +225,38 @@ fn generate_tags_page(
         "tags.html",
     );
     writer.write_all(header_str.as_bytes())?;
-    writer.write_all("<h1>Tags</h1><hr>".as_bytes())?;
+    writer.write_all(b"<h1>Tags</h1><hr>")?;
 
-    for tag in tags {
-        let indices = &tags_map[tag];
-        writer.write_all(b"<br><details><summary id=\"")?;
+    writer.write_all(b"<ul>\n")?;
+    for tag in &tags {
+        writer.write_all(b"<li><a href=\"")?;
         writer.write_all(tag.as_bytes())?;
-        writer.write_all(b"\">")?;
+        writer.write_all(b".html\">")?;
         writer.write_all(tag.as_bytes())?;
-        writer.write_all(b"</summary>\n")?;
+        writer.write_all(b"</a></li>\n")?;
+    }
+    writer.write_all(b"</ul>\n")?;
+
+    writer.write_all(FOOTER.as_bytes())?;
+    writer.flush()?;
+
+    // Generate individual tag pages
+    for tag in &tags {
+        let indices = &tags_map[*tag];
+
+        let file = fs::File::create(html_dir.join(format!("{tag}.html")))?;
+        let mut writer = BufWriter::new(file);
+
+        let header_str = generate_header(
+            tag,
+            &format!("Articles tagged {tag}"),
+            &format!("blog, blogpost, {tag}"),
+            &format!("{tag}.html"),
+        );
+        writer.write_all(header_str.as_bytes())?;
+        writer.write_all(b"<h1>")?;
+        writer.write_all(tag.as_bytes())?;
+        writer.write_all(b"</h1><hr>")?;
 
         writer.write_all(b"<ul>\n")?;
         for &idx in indices {
@@ -241,11 +264,11 @@ fn generate_tags_page(
             writer.write_all(labels[idx].as_bytes())?;
             writer.write_all(b"</li>\n")?;
         }
-        writer.write_all(b"</ul>\n</details>\n")?;
-    }
+        writer.write_all(b"</ul>\n")?;
 
-    writer.write_all(FOOTER.as_bytes())?;
-    writer.flush()?;
+        writer.write_all(FOOTER.as_bytes())?;
+        writer.flush()?;
+    }
 
     Ok(())
 }
@@ -281,7 +304,7 @@ impl Frontmatter {
 
     fn label(&self, link: &str, date: &DateTime<Utc>) -> String {
         let mut label = format!(
-            "<h2 class=\"article-title\"><a href=\"{}\">{}</a></h2>",
+            "<h2 class=\"header-link\"><a href=\"{}\">{}</a></h2>",
             link, self.title
         );
 
