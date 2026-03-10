@@ -159,9 +159,9 @@ Tree-sitter powers the highlighting in editors such as
 [Neovim](https://neovim.io/doc/user/treesitter.html) and [Zed](https://zed.dev/blog/syntax-aware-editing).
 
 When `pulldown-cmark` identifies a code block with a language tag,
-`autumnus` generates HTML with different CSS classes for different code elements
+`lumis` generates HTML with different CSS classes for different code elements
 like keywords, variables, and constants for the language specified with the tag. 
-This enables for syntax highlighting through CSS styles and the `autumnus` repo provides several [CSS files for various themes](https://github.com/leandrocp/autumnus/tree/main/css) such as Tokyo Night and Catppuccin. 
+This enables for syntax highlighting through CSS styles and the `lumis` repo provides several [CSS files for various themes](https://github.com/leandrocp/autumnus/tree/main/css) such as Tokyo Night and Catppuccin. 
 
 Generated HTML with style classes for the above code:
 

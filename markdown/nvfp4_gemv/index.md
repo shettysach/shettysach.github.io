@@ -406,7 +406,7 @@ for i in cutlass.range_constexpr(mma_tiler_mnk[2]):
     res += tABrAB[i] * tSFrSF[i]
 ```
 
-The `tABrAB` and `tSFrSF` and the `*_vec` variables, are `TensorSSA` and the computation happens in the registers.
+The `tABrAB`, `tSFrSF` and the `*_vec` variables, are `TensorSSA` and the computation happens in the registers.
 Here is a Jupyter notebook from the CUTLASS repo, [tensorssa.ipynb](https://github.com/NVIDIA/cutlass/blob/main/examples/python/CuTeDSL/notebooks/tensorssa.ipynb) that explains the `TensorSSA` abstraction and how to use them. 
                        
 This provides a small speedup and makes it easier for later optimizations.

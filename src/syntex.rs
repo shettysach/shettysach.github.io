@@ -105,6 +105,7 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
             "rust" | "rs" => Language::Rust,
             "python" | "py" => Language::Python,
             "latex" | "tex" => Language::LaTeX,
+            "haskell" | "hs" => Language::Haskell,
             "html" => Language::HTML,
             _ => Language::PlainText,
         })

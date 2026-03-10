@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 // styles_dir
 
 pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
-    for entry in WalkDir::new(src).max_depth(2).into_iter().flatten() {
+    for entry in WalkDir::new(src).max_depth(1).into_iter().flatten() {
         let source = entry.path();
         let rel_path = source.strip_prefix(src)?;
         let target = dst.join(rel_path);
@@ -16,10 +16,6 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
         {
             fs::copy(source, &target)?;
         }
-
-        // else if entry.file_type().is_dir() && !target.exists() {
-        //     fs::create_dir_all(&target)?;
-        // }
     }
 
     Ok(())

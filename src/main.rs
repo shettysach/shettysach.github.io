@@ -1,10 +1,10 @@
 #![feature(if_let_guard)]
 
 mod anchored;
-mod atom;
 mod generate;
 mod syntex;
 mod utils;
+mod xml;
 
 use anyhow::Result;
 use std::{fs, path::Path};

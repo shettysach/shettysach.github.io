@@ -1,7 +1,7 @@
 use crate::{
     anchored::AnchoredIterator,
-    atom::{Entry, generate_atom_feed, generate_sitemap},
     syntex::{CustomIterator, OPTIONS, process_metadata},
+    xml::{Entry, generate_feed, generate_sitemap},
 };
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, NaiveDate, Utc};
@@ -24,9 +24,9 @@ pub(crate) fn ssgenerate(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 
     let (atom_entries, labels, tags_map) = collect_articles(markdown_dir, html_dir)?;
 
-    generate_articles_page(&labels, html_dir)?;
-    generate_tags_page(&labels, tags_map, html_dir)?;
-    generate_atom_feed(&atom_entries, &html_dir.join("atom.xml"))?;
+    generate_articles(&labels, html_dir)?;
+    generate_tags(&labels, tags_map, html_dir)?;
+    generate_feed(&atom_entries, &html_dir.join("atom.xml"))?;
     generate_sitemap(atom_entries, &html_dir.join("sitemap.xml"))?;
 
     Ok(())
@@ -110,7 +110,7 @@ fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
             let mut label = frontmatter.label(&rel_url, &datetime);
 
             if let Some(tags) = frontmatter.tags {
-                label.push_str(" │ ");
+                label.push_str(" · ");
 
                 let mut first = true;
                 for tag in tags {
@@ -180,7 +180,7 @@ fn generate_article(
     Ok((frontmatter, date))
 }
 
-fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
+fn generate_articles(labels: &[String], html_dir: &Path) -> Result<()> {
     let file = fs::File::create(html_dir.join("articles.html"))?;
     let mut writer = BufWriter::new(file);
 
@@ -207,7 +207,7 @@ fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_tags_page(
+fn generate_tags(
     labels: &[String],
     tags_map: HashMap<String, Vec<usize>>,
     html_dir: &Path,
