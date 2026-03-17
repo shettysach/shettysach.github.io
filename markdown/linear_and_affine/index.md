@@ -1,7 +1,7 @@
 ---
 title: Linear and Affine
 subtitle: In types and transformations
-date: 2026-03-10
+date: 2026-03-17
 tags: [ Math, Type Theory, Linear Algebra, Vector Spaces ]
 
 draft: true
@@ -19,7 +19,7 @@ but I wanted to get a clear understanding of their relation and a possible commo
 Linear and affine type systems tell you how many times a value may be used.
 
 A linear type must be used exactly once. This means it cannot be left unused, or used more than once.
-Linear Haskell enforces this directly; a function with a linear arrow `%1 ->` guarantees that its argument is consumed exactly once by the function body[^1].
+In Linear Haskell, a function with a linear arrow `%1 ->` guarantees that its argument is consumed exactly once by the function body[^1].
 
 ```haskell
 consumeFile :: Handle %1 -> IO ()
@@ -48,13 +48,16 @@ Linear and affine types are useful for managing resources like file handles, net
 ## Transformations
 
 Linear and affine transformations come from linear algebra and vector spaces, 
-and later have been applied in the field of 3D graphics, for transforming and projecting 3D objects.
+and are applied in fields such as 3D graphics, for transforming and projecting 3D objects.
 
-A transformation is just a function. It takes a point in space and maps it to another point. 
+In linear algebra, a transformation is just a function. 
+It takes a point in vector space and maps it to another point in a vector space. 
+A linear transformation, a linear function and a linear map refer to the same thing in linear algebra.
 What makes a transformation linear or affine is a constraint on how that mapping is allowed to behave.
 
 A linear transformation is one that preserves the origin and scales uniformly with its input. 
-Formally, it must satisfy two conditions - it respects addition, and scales with its input:
+Formally, it must satisfy two conditions - it should be [additive](https://en.wikipedia.org/wiki/Additive_map), 
+and should scale linearly with its input[^2]:
 
 $$
 \begin{align*}
@@ -63,28 +66,29 @@ f(\alpha v) &= \alpha f(v)
 \end{align*}
 $$
 
-Together, these force $f(0) = 0$, the origin must map to itself. Every linear transformation can be written in the form:
+Together, these force $f(0) = 0$. The origin must map to itself[^3]. Every linear function or transformation can be written in the form:
 
 $$f(x) = Ax$$
 
-where $A$ is a matrix. In vector space, this covers rotation, scaling, and reflection, but not translation.
+where $A$ is a matrix, and $Ax$ represents [matrix-vector multiplication](/nvfp4_gemv/index.html#gemv).
+In vector space, this covers rotation, scaling, and reflection, but not translation.
 
 An affine transformation relaxes this by allowing a translation on top, meaning the origin can move.
 The general form is just a linear transformation with a shift added:
 
 $$f(x) = Ax + b$$
 
-Now $f(0) = b$ instead of $0$, so objects can actually move through space, not just rotate or scale in place.
+where $b$ is a vector, and $Ax + b$ represents vector addition. Now $f(0) = b$ instead of $0$, so objects can actually move through space, not just rotate or scale in place.
 Thus, rendering 3D graphics mostly uses affine transformations, as translation is important for various pipelines
 such as rasterization.
 
 ## The Common Origin and Intuition
 
-Both pairs of concepts trace back to the same underlying idea, which comes from Girard's linear logic[^3].
+Both pairs of concepts trace back to the same underlying idea, which comes from Girard's linear logic[^4].
 
 In classical logic, you can freely use a premise as many times as you want, or ignore it entirely. Girard refers to these two rules as - 
-- **Contraction**, which lets you duplicate an assumption, using it more than once.
-- **Weakening** lets you discard an assumption, ignoring it entirely.
+- __Contraction__, which lets you duplicate an assumption, using it more than once.
+- __Weakening__, which lets you discard an assumption, ignoring it entirely.
 
 Linear logic rejects both. If you have a resource, you must use it, and you must use it only once. Affine logic rejects only contraction and allows weakening. If you have a resource you can use it at most once, and are allowed to discard it without using. 
 
@@ -108,17 +112,22 @@ I wrote this post because I couldn't immediately understand the association of t
 One dealt with the consumption of resources, and the other dealt with transformations of shapes in a 3D space.
 
 This article isn't too deep into the math, as I am not too deep into the math.
-I've only given a surface level view of various topics and 
-you are encouraged to check the resources in the footnotes.
+I've only given a surface level view of various topics and you are encouraged to check the resources in the footnotes.
 
 ---
 
-Footnotes -
-[^1]: https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html
-[^2]: https://en.wikipedia.org/wiki/Homogeneous_function
-[^3]: [LINEAR LOGIC : ITS SYNTAX AND
-SEMANTICS - Jean-Yves Girard](https://girard.perso.math.cnrs.fr/Synsem.pdf) \
-https://en.wikipedia.org/wiki/Linear_logic
+__Footnotes__
 
-Other resources -
-- https://www.reddit.com/r/ProgrammingLanguages/comments/1e1o07f/benefits_of_linear_types_over_affine_types/
+[^1]: <https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html>
+[^2]: A function that scales linearly with its input is a [homogeneous function](https://en.wikipedia.org/wiki/Homogeneous_function) of order 1
+
+[^3]: 
+    A linear function in linear algebra and a linear function in calculus are [not the same](https://en.wikipedia.org/wiki/Linear_function). \
+    In calculus, $f(x)=x+3$ is called a linear function as it is a polynomial of degree 1, but in linear algebra, $f(x)=x+3$ cannot be called a linear function as $f(0) \neq{} 0$.
+
+[^4]: [LINEAR LOGIC : ITS SYNTAX AND SEMANTICS - Jean-Yves Girard](https://girard.perso.math.cnrs.fr/Synsem.pdf) \
+<https://en.wikipedia.org/wiki/Linear_logic>
+
+__Other resources__
+
+- <https://www.reddit.com/r/ProgrammingLanguages/comments/1e1o07f/benefits_of_linear_types_over_affine_types/>
