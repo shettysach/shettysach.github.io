@@ -3,15 +3,15 @@ title: Linear and Affine
 subtitle: In types and transformations
 date: 2026-03-17
 tags: [ Math, Type Theory, Linear Algebra, Vector Spaces ]
-
-draft: true
 ---
 
 # Linear and Affine
 
-While learning the basics of type theory and rasterization in 3D graphics, I came across 2 pairs of concepts - 
+---
+
+While reading about the basics of type theory and rasterization in 3D graphics, I came across 2 pairs of concepts - 
 linear and affine types, and linear and affine transformations.
-Both the pairs of concepts make a clear distinction between linear and affine, with affine having a bit more freedom than linear, 
+Both pairs of concepts make a clear distinction between linear and affine, with affine having a bit more freedom than linear, 
 but I wanted to get a clear understanding of their relation and a possible common origin.
 
 ## Types
@@ -79,18 +79,18 @@ The general form is just a linear transformation with a shift added:
 $$f(x) = Ax + b$$
 
 where $b$ is a vector, and $Ax + b$ represents vector addition. Now $f(0) = b$ instead of $0$, so objects can actually move through space, not just rotate or scale in place.
-Thus, rendering 3D graphics mostly uses affine transformations, as translation is important for various pipelines
+Thus, rendering 3D graphics mostly relies on affine transformations, as translation is important for various pipelines
 such as rasterization.
 
 ## The Common Origin and Intuition
 
 Both pairs of concepts trace back to the same underlying idea, which comes from Girard's linear logic[^4].
 
-In classical logic, you can freely use a premise as many times as you want, or ignore it entirely. Girard refers to these two rules as - 
+In classical logic, you can freely use a premise as many times as you want or ignore it entirely. Girard refers to these two rules as - 
 - __Contraction__, which lets you duplicate an assumption, using it more than once.
 - __Weakening__, which lets you discard an assumption, ignoring it entirely.
 
-Linear logic rejects both. If you have a resource, you must use it, and you must use it only once. Affine logic rejects only contraction and allows weakening. If you have a resource you can use it at most once, and are allowed to discard it without using. 
+Linear logic rejects both. If you have a resource, you must use it and you must use it only once. Affine logic rejects only contraction and allows weakening. If you have a resource you can use it at most once, and are allowed to discard it without using. 
 
 You can see how linear and affine types are directly analogous to this, where the resources are instances of the types. The transformations also take from this concept.
  Consider a function written as a power series:
@@ -104,30 +104,30 @@ Each term corresponds to a different degree of use of the input $x$.
 
 A linear function, in Girard's sense, keeps only the $a_1 x$ term, and the input is used exactly once. This is similar to the usage of a linear type, and to the $f(x) = Ax$ form of linear transformations. 
 
-An affine function allows the $a_0$ term too. The input may be used once, or ignored entirely, similar to the usage of an affine type, and is similar to $f(x) = Ax + b$ form of affine transformations. 
+An affine function allows the $a_0$ term too. The input may be used once, or ignored entirely, similar to the usage of an affine type, and is similar to the $f(x) = Ax + b$ form of affine transformations. 
 
-## Conclusion
+## Closing notes
 
 I wrote this post because I couldn't immediately understand the association of the two different concepts. 
 One dealt with the consumption of resources, and the other dealt with transformations of shapes in a 3D space.
-
-This article isn't too deep into the math, as I am not too deep into the math.
-I've only given a surface level view of various topics and you are encouraged to check the resources in the footnotes.
+This article isn't too deep into the math and I've only given a surface level view of various topics. 
+You are encouraged to check the resources in the footnotes.
 
 ---
 
 __Footnotes__
 
-[^1]: <https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html>
+[^1]: [6.4.22. Linear types — Glasgow Haskell Compiler User's Guide](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/linear_types.html)
 [^2]: A function that scales linearly with its input is a [homogeneous function](https://en.wikipedia.org/wiki/Homogeneous_function) of order 1
 
 [^3]: 
     A linear function in linear algebra and a linear function in calculus are [not the same](https://en.wikipedia.org/wiki/Linear_function). \
-    In calculus, $f(x)=x+3$ is called a linear function as it is a polynomial of degree 1, but in linear algebra, $f(x)=x+3$ cannot be called a linear function as $f(0) \neq{} 0$.
+    In calculus, $f(x)=x+3$ can be called a linear function as it is a polynomial of degree 1, but in linear algebra, $f(x)=x+3$ cannot be called a linear function as $f(0) \neq{} 0$.
 
 [^4]: [LINEAR LOGIC : ITS SYNTAX AND SEMANTICS - Jean-Yves Girard](https://girard.perso.math.cnrs.fr/Synsem.pdf) \
 <https://en.wikipedia.org/wiki/Linear_logic>
 
 __Other resources__
 
-- <https://www.reddit.com/r/ProgrammingLanguages/comments/1e1o07f/benefits_of_linear_types_over_affine_types/>
+- [Benefits of linear types over affine types? - r/ProgrammingLanguage ](https://www.reddit.com/r/ProgrammingLanguages/comments/1e1o07f/benefits_of_linear_types_over_affine_types/)
+- [Linear VS Affine - Lei Mao's Log Book](https://leimao.github.io/blog/Linear-VS-Affine/)

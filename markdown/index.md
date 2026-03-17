@@ -11,7 +11,7 @@ Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests i
 
 ## Personal projects
 
-Here are some of my personal projects. For more detail read this [article](./projects/index.html).
+Here are some of my personal projects. For more detail read this [page](./projects/index.html).
 
 |Project  |Description  |
 |--|--|
