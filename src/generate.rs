@@ -54,10 +54,11 @@ fn generate_index(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-type C = (Vec<Entry>, Vec<String>, HashMap<String, Vec<usize>>);
+type TagsMap = HashMap<String, (Vec<usize>, SystemTime)>;
+type C = (Vec<Entry>, Vec<String>, TagsMap);
 fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
     let mut articles = Vec::new();
-    let mut tags_map: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut tags_map: TagsMap = HashMap::new();
 
     let index_path = markdown_dir.join("index.md");
     for entry in WalkDir::new(markdown_dir)
@@ -90,7 +91,7 @@ fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
                 |nd| nd.and_hms_opt(0, 0, 0).unwrap().and_utc(),
             );
 
-            articles.push((frontmatter, datetime, rel_url));
+            articles.push((frontmatter, datetime, rel_url, modified));
         } else if src_path.is_dir() {
             if !dst_path.exists() {
                 fs::create_dir(&dst_path)?;
@@ -106,7 +107,7 @@ fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
     let (entries, labels): (Vec<Entry>, Vec<String>) = articles
         .into_iter()
         .enumerate()
-        .map(|(idx, (frontmatter, datetime, rel_url))| {
+        .map(|(idx, (frontmatter, datetime, rel_url, modified))| {
             let mut label = frontmatter.label(&rel_url, &datetime);
 
             if let Some(tags) = frontmatter.tags {
@@ -124,7 +125,15 @@ fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
                     label.push_str(&tag);
                     label.push_str("</a>");
 
-                    tags_map.entry(tag).or_default().push(idx);
+                    tags_map
+                        .entry(tag)
+                        .and_modify(|(indices, max_mod)| {
+                            indices.push(idx);
+                            if modified > *max_mod {
+                                *max_mod = modified;
+                            }
+                        })
+                        .or_insert_with(|| (vec![idx], modified));
                 }
             }
 
@@ -207,11 +216,7 @@ fn generate_articles(labels: &[String], html_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_tags(
-    labels: &[String],
-    tags_map: HashMap<String, Vec<usize>>,
-    html_dir: &Path,
-) -> Result<()> {
+fn generate_tags(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> Result<()> {
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
@@ -242,9 +247,14 @@ fn generate_tags(
 
     // Generate individual tag pages
     for tag in &tags {
-        let indices = &tags_map[*tag];
+        let (indices, src_modified) = &tags_map[*tag];
+        let dst_path = html_dir.join(format!("{tag}.html"));
 
-        let file = fs::File::create(html_dir.join(format!("{tag}.html")))?;
+        if dst_path.exists() && dst_path.metadata()?.modified()? > *src_modified {
+            continue;
+        }
+
+        let file = fs::File::create(dst_path)?;
         let mut writer = BufWriter::new(file);
 
         let header_str = generate_header(

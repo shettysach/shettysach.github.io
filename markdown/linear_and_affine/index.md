@@ -82,11 +82,11 @@ where $b$ is a vector, and $Ax + b$ represents vector addition. Now $f(0) = b$ i
 Thus, rendering 3D graphics mostly relies on affine transformations, as translation is important for various pipelines
 such as rasterization.
 
-## The Common Origin and Intuition
+## Common origin and intuition
 
 Both pairs of concepts trace back to the same underlying idea, which comes from Girard's linear logic[^4].
 
-In classical logic, you can freely use a premise as many times as you want or ignore it entirely. Girard refers to these two rules as - 
+In classical logic, you can freely use a premise as many times as you want or ignore it entirely. Girard refers to these two rules as
 - __Contraction__, which lets you duplicate an assumption, using it more than once.
 - __Weakening__, which lets you discard an assumption, ignoring it entirely.
 
