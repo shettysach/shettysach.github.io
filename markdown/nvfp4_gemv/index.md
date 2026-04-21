@@ -105,11 +105,11 @@ There are 3 shapes to target, `n` is always 1 since GEMV
 for Python is a high‑level, Python front end over NVIDIA’s CUTLASS/CuTe tensor core infrastructure 
 that lets you describe GPU kernels in terms of tiled tensors, layouts, and copy/compute primitives, and also low-level optimizations when needed. 
 The tiling abstraction seems to be the direction kernel frameworks are headed, and since there was a template file using the DSL, 
-I chose to use CuTe for the problem.
+I chose to use CuTe DSL for the problem.
 
 ## Reference kernel
 
-I based my implementation on the CuTe template kernel, `template_cute.py`, that can be found [here](https://github.com/gpu-mode/reference-kernels/blob/main/problems/nvidia/nvfp4_gemv/template_cute.py). Here is a breakdown of the file.
+I based my implementation on the CuTe DSL template kernel, `template_cute.py`, that can be found [here](https://github.com/gpu-mode/reference-kernels/blob/main/problems/nvidia/nvfp4_gemv/template_cute.py). Here is a breakdown of the file.
 
 ### Setup
 
@@ -144,13 +144,13 @@ It performs the batched block-scaled GEMV operation.
 
 1. Each CTA handles a tile of the output `c` - 128 rows x 1 column (`mma_tiler_mnk[:2]`) for one batch $l$.
 2. Each thread (`tidx`) is responsible for 1 output element `c[x,0,z]` within that tile.
-3. CuTe’s `local_tile` creates matching tiled views of `a, b, sfa, sfb, c`, so the right chunks line up in memory.
+3. CuTe DSL’s `local_tile` creates matching tiled views of `a, b, sfa, sfb, c`, so the right chunks line up in memory.
 4. The kernel reduces over $K$ in chunks of 64 elements (`mma_tiler_mnk[2]`) - load FP4 and FP8, convert to FP32, then accumulate the scaled products.
 5. After all $K$ tiles are processed, it casts FP32 to FP16 and stores the result to `c`.
 
 
 ```py
-# The CuTe reference implementation for NVFP4 block-scaled GEMV
+# The CuTe DSL reference implementation for NVFP4 block-scaled GEMV
 @cute.kernel
 def kernel(
     mA_mkl: cute.Tensor,
@@ -205,7 +205,7 @@ def kernel(
         sfa_val = sfa_val_fp8.to(cutlass.Float32)
         sfb_val = sfb_val_fp8.to(cutlass.Float32)
 
-        # Store the converted values to RMEM CuTe tensors
+        # Store the converted values to RMEM CuTe DSL tensors
         tArA.store(a_val)
         tBrB.store(b_val)
         tArSFA.store(sfa_val)
@@ -842,24 +842,24 @@ mnk_tile = (m_tile, 1, k_tile)
 
 ## Ideas that didn't pay off
 
-Manually prefetching tiles didn’t help. However, like I'll elaborate in the next section, using copy primitives and pipelining provided by CuTe such as [Copy Atom](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl_api/cute.html#cutlass.cute.CopyAtom) likely could have helped.
+Manually prefetching tiles didn’t help. However, like I'll elaborate in the next section, using copy primitives and pipelining provided by CuTe DSL such as [Copy Atom](https://docs.nvidia.com/cutlass/media/docs/pythonDSL/cute_dsl_api/cute.html#cutlass.cute.CopyAtom) likely could have helped.
 
 Using 2 16-bit lane addition and multiplication using the PTX instructions `add.f16x2` and `mul.rn.f16x2`, similar to the FMA optimization, 
 didn't provide a speedup probably because the compiler already optimized this. I also tried reducing `r0` and `r1` separately, then combining them at the end, but it either introduced small precision differences or didn’t improve performance.
 
-I also experimented with manual loop unrolling, but it didn’t help. CuTe unrolls the fixed-size loops well. Similarly, I tried tweaking compilation options (optimization level, explicit GPU architecture, and PTXAS flags like `--maxrregcount`), but the defaults were already optimal.
+I also experimented with manual loop unrolling, but it didn’t help. CuTe DSL unrolls the fixed-size loops well. Similarly, I tried tweaking compilation options (optimization level, explicit GPU architecture, and PTXAS flags like `--maxrregcount`), but the defaults were already optimal.
 
 ## Flaws
 
-The improved kernel is still far from optimal. CuTe gives you building blocks for Tensor Core MMA via the `tcgen05` set for Blackwell, pipelines for data movement (so loads and compute overlap), and shared-memory tiling patterns that make sure threads cooperate and reuse data efficiently. 
-In my version, I’m still mostly doing a manual load, convert, compute loop and only using CuTe for tiling and launching, so I’m not taking full advantage of CuTe and its higher-level features. 
+The improved kernel is still far from optimal. CuTe DSL gives you building blocks for Tensor Core MMA via the `tcgen05` set for Blackwell, pipelines for data movement (so loads and compute overlap), and shared-memory tiling patterns that make sure threads cooperate and reuse data efficiently. 
+In my version, I’m still mostly doing a manual load, convert, compute loop and only using CuTe DSL for tiling and launching, so I’m not taking full advantage of CuTe DSL and its higher-level features. 
 
-The blogpost [tcgen05 for dummies, from gau-nernst's blog](https://gau-nernst.github.io/tcgen05/) goes into detail about writing efficient kernels with the `tcgen05` set. The CUTLASS repo also provides [CuTe examples for Blackwell GPUs](https://github.com/NVIDIA/cutlass/tree/main/examples/python/CuTeDSL/blackwell) for various GEMM variants.
+The blogpost [tcgen05 for dummies, from gau-nernst's blog](https://gau-nernst.github.io/tcgen05/) goes into detail about writing efficient kernels with the `tcgen05` set. The CUTLASS repo also provides [CuTe DSL examples for Blackwell GPUs](https://github.com/NVIDIA/cutlass/tree/main/examples/python/CuTeDSL/blackwell) for various GEMM variants.
 I did go on to use these features in the kernels for the next rounds, 
 modifying the [dense_blockscaled_gemm_persistent.py](https://github.com/NVIDIA/cutlass/blob/main/examples/python/CuTeDSL/blackwell/dense_blockscaled_gemm_persistent.py) example.
 
 Apart from that, even with this manual approach, I should still be able to improve things like memory access patterns and register pressure/occupancy.
-A combination of higher-level CuTe features (like copy primitives, swizzled layouts), together with this manual approach could have helped, but I wasn’t familiar enough with CuTe at the time to use them effectively.
+A combination of higher-level CuTe DSL features (like copy primitives, swizzled layouts), together with this manual approach could have helped, but I wasn’t familiar enough with CuTe DSL at the time to use them effectively.
 
 Regarding the article itself, it would be much better if I had specified the time taken / speedups after each optimization, but
 I only got the idea to write much later, so I didn’t record them while I was iterating. 
@@ -869,10 +869,10 @@ so the speedup numbers per optimization wouldn't be very accurate.
 ## Credits and thank you
 
 Again, I give huge credit to [Simon's blog](https://veitner.bearblog.dev/blog/), 
-for helping me get started with CuTe and the problem, and for learning about ways to optimize.
+for helping me get started with CuTe DSL and the problem, and for learning about ways to optimize.
 I'd also like to thank GPUMODE and NVIDIA for organizing the competition.
 
 This was my first submission to a kernel optimization contest and my first work log.
 You can find my submission at the [leaderboard page](https://www.gpumode.com/leaderboard/595?tab=rankings) 
-under the name swanbomb_ (25.989μs). I would recommend checking out the faster CuTe solutions to see their approaches too.
+under the name swanbomb_ (25.989μs). I would recommend checking out the faster CuTe DSL solutions to see their approaches too.
 Thank you for reading.

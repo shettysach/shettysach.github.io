@@ -55,8 +55,10 @@ fn generate_index(markdown_dir: &Path, html_dir: &Path) -> Result<()> {
 }
 
 type TagsMap = HashMap<String, (Vec<usize>, SystemTime)>;
-type C = (Vec<Entry>, Vec<String>, TagsMap);
-fn collect_articles(markdown_dir: &Path, html_dir: &Path) -> Result<C> {
+fn collect_articles(
+    markdown_dir: &Path,
+    html_dir: &Path,
+) -> Result<(Vec<Entry>, Vec<String>, TagsMap)> {
     let mut articles = Vec::new();
     let mut tags_map: TagsMap = HashMap::new();
 
