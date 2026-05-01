@@ -18,6 +18,7 @@ pub(crate) struct CustomIterator<'a, I: Iterator<Item = Event<'a>>> {
     storage: Storage,
     code: Option<CowStr<'a>>,
     footnote: Option<CowStr<'a>>,
+    pub(crate) error: Option<anyhow::Error>,
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
@@ -27,6 +28,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> CustomIterator<'a, I> {
             storage: Storage::new(),
             code: None,
             footnote: None,
+            error: None,
         }
     }
 }
@@ -42,9 +44,9 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
                 self.next()
             }
 
-            Event::Text(code) if let Some(lang) = self.code.as_mut() => {
-                Some(Event::Html(CowStr::from(highlight_code(&code, lang).ok()?)))
-            }
+            Event::Text(code) if let Some(lang) = &self.code => Some(Event::Html(CowStr::from(
+                highlight_code(&code, lang).unwrap(),
+            ))),
 
             Event::End(TagEnd::CodeBlock) if self.code.is_some() => {
                 self.code = None;
@@ -52,13 +54,25 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
             }
 
             // -- Math --
-            Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
-                latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).ok()?,
-            ))),
+            Event::DisplayMath(latex) => {
+                match latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block) {
+                    Ok(str) => Some(Event::Html(CowStr::from(str))),
+                    Err(err) => {
+                        self.error = Some(err);
+                        None
+                    }
+                }
+            }
 
-            Event::InlineMath(latex) => Some(Event::InlineHtml(CowStr::from(
-                latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).ok()?,
-            ))),
+            Event::InlineMath(latex) => {
+                match latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline) {
+                    Ok(res) => Some(Event::InlineHtml(res.into())),
+                    Err(err) => {
+                        self.error = Some(err);
+                        None
+                    }
+                }
+            }
 
             // -- Footnotes --
             Event::FootnoteReference(name) => Some(Event::InlineHtml(CowStr::from(format!(

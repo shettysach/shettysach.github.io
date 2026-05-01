@@ -3,7 +3,7 @@ use crate::{
     syntex::{CustomIterator, OPTIONS, process_metadata},
     xml::{Entry, generate_feed, generate_sitemap},
 };
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use std::{
@@ -177,12 +177,19 @@ fn generate_article(
     writer.write_all(frontmatter.generate_header(rel_url).as_bytes())?;
 
     let parser = TextMergeStream::new(parser);
-    if anchors {
-        let parser = AnchoredIterator::new(parser);
-        write_html_io(&mut writer, parser)?;
+    let err = if anchors {
+        let mut parser = AnchoredIterator::new(parser);
+        write_html_io(&mut writer, &mut parser)?;
+        parser.error.take()
     } else {
-        let parser = CustomIterator::new(parser);
-        write_html_io(&mut writer, parser)?;
+        let mut parser = CustomIterator::new(parser);
+        write_html_io(&mut writer, &mut parser)?;
+        parser.error.take()
+    };
+
+    if let Some(err) = err {
+        writer.flush()?;
+        bail!("Error rendering {}: {err}", src.display());
     }
 
     writer.write_all(FOOTER.as_bytes())?;
