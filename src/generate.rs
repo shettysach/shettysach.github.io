@@ -2,9 +2,9 @@ use crate::{
     anchored::AnchoredIterator,
     cache::{CacheEntry, MetadataCache},
     syntex::{CustomIterator, OPTIONS, process_metadata},
-    xml::{Entry, generate_feed, generate_sitemap},
+    xml::{Entry, generate_atom_feed, generate_sitemap},
 };
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use serde::{Deserialize, Serialize};
@@ -15,13 +15,11 @@ use std::{
     path::Path,
     time::SystemTime,
 };
-use walkdir::WalkDir;
-use yaml_rust2::Yaml;
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
 
-pub(crate) fn ssgenerate(
+pub(crate) fn generate_site(
     markdown_dir: &Path,
     html_dir: &Path,
     cache: &mut MetadataCache,
@@ -30,9 +28,9 @@ pub(crate) fn ssgenerate(
 
     let (labels, entries, tags_map) = collect_articles(markdown_dir, html_dir, cache)?;
 
-    generate_articles(&labels, html_dir)?;
-    generate_tags(&labels, tags_map, html_dir)?;
-    generate_feed(&entries, &html_dir.join("atom.xml"))?;
+    generate_articles_page(&labels, html_dir)?;
+    generate_tags_page(&labels, tags_map, html_dir)?;
+    generate_atom_feed(&entries, &html_dir.join("atom.xml"))?;
     generate_sitemap(entries, &html_dir.join("sitemap.xml"))?;
 
     Ok(())
@@ -40,9 +38,9 @@ pub(crate) fn ssgenerate(
 
 fn generate_index(markdown_dir: &Path, html_dir: &Path, cache: &mut MetadataCache) -> Result<()> {
     let src_path = markdown_dir.join("index.md");
-    let modified = DateTime::<Utc>::from(src_path.metadata()?.modified()?);
+    let modified = src_path.metadata()?.modified()?;
 
-    if let Some(entry) = cache.get_entry("index.md")
+    if let Some(entry) = cache.entries.get("index.md")
         && entry.mtime >= modified
     {
         return Ok(());
@@ -65,8 +63,8 @@ fn generate_index(markdown_dir: &Path, html_dir: &Path, cache: &mut MetadataCach
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    cache.insert(
-        "index.md",
+    cache.entries.insert(
+        "index.md".to_string(),
         CacheEntry {
             mtime: modified,
             metadata,
@@ -86,7 +84,7 @@ fn collect_articles(
     let mut tags_map: TagsMap = HashMap::new();
 
     let index_path = markdown_dir.join("index.md");
-    for entry in WalkDir::new(markdown_dir)
+    for entry in walkdir::WalkDir::new(markdown_dir)
         .max_depth(2)
         .into_iter()
         .filter_map(Result::ok)
@@ -187,10 +185,9 @@ fn generate_article(
     rel_path: &str,
     cache: &mut MetadataCache,
 ) -> Result<Metadata> {
-    let modified_dt = DateTime::<Utc>::from(modified);
-
-    if let Some(entry) = cache.get_entry(rel_path)
-        && entry.mtime >= modified_dt
+    // Cache hit. No change article, no need to render.
+    if let Some(entry) = cache.entries.get(rel_path)
+        && entry.mtime >= modified
     {
         return Ok(entry.metadata.clone());
     }
@@ -199,16 +196,18 @@ fn generate_article(
     let mut parser = Parser::new_ext(&markdown, OPTIONS);
 
     let doc = process_metadata(&mut parser)
-        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
+        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.display()))?;
     let anchors = doc["anchors"].as_bool().unwrap_or(false);
     let metadata = Metadata::parse_metadata(doc)
-        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.to_string_lossy()))?;
+        .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.display()))?;
 
+    // Cache miss, but destination HTML is already up-to-date.
+    // Skip rendering and repopulate cache for next time.
     if dst.exists() && dst.metadata()?.modified()? > modified {
-        cache.insert(
-            rel_path,
+        cache.entries.insert(
+            rel_path.to_string(),
             CacheEntry {
-                mtime: modified_dt,
+                mtime: modified,
                 metadata: metadata.clone(),
             },
         );
@@ -221,36 +220,28 @@ fn generate_article(
     writer.write_all(metadata.generate_header(rel_url).as_bytes())?;
 
     let parser = TextMergeStream::new(parser);
-    let err = if anchors {
-        let mut parser = AnchoredIterator::new(parser);
-        write_html_io(&mut writer, &mut parser)?;
-        parser.error.take()
+    if anchors {
+        let parser = AnchoredIterator::new(parser);
+        write_html_io(&mut writer, parser)?;
     } else {
-        let mut parser = CustomIterator::new(parser);
-        write_html_io(&mut writer, &mut parser)?;
-        parser.error.take()
-    };
-
-    if let Some(err) = err {
-        writer.flush()?;
-        bail!("Error rendering {}: {err}", src.display());
+        let parser = CustomIterator::new(parser);
+        write_html_io(&mut writer, parser)?;
     }
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    cache.insert(
-        rel_path,
+    cache.entries.insert(
+        rel_path.to_string(),
         CacheEntry {
-            mtime: modified_dt,
+            mtime: modified,
             metadata: metadata.clone(),
         },
     );
-
     Ok(metadata)
 }
 
-fn generate_articles(labels: &[String], html_dir: &Path) -> Result<()> {
+fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
     let file = fs::File::create(html_dir.join("articles.html"))?;
     let mut writer = BufWriter::new(file);
 
@@ -277,7 +268,7 @@ fn generate_articles(labels: &[String], html_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_tags(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> Result<()> {
+fn generate_tags_page(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> Result<()> {
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
@@ -391,7 +382,7 @@ impl Metadata {
         label
     }
 
-    fn parse_metadata(doc: Yaml) -> Option<Metadata> {
+    fn parse_metadata(doc: yaml_rust2::Yaml) -> Option<Metadata> {
         let title = doc["title"].as_str()?.to_string();
         let subtitle = doc["subtitle"].as_str().map(str::to_string);
         let tags = doc["tags"]

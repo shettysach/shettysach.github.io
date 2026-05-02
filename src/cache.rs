@@ -1,18 +1,18 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 use std::{collections::HashMap, path::Path};
 
 use crate::generate::Metadata;
 
 #[derive(Serialize, Deserialize, Default)]
 pub(crate) struct MetadataCache {
-    entries: HashMap<String, CacheEntry>,
+    pub(crate) entries: HashMap<String, CacheEntry>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct CacheEntry {
-    pub(crate) mtime: DateTime<Utc>,
+    pub(crate) mtime: SystemTime,
     pub(crate) metadata: Metadata,
 }
 
@@ -31,14 +31,6 @@ impl MetadataCache {
         let json = serde_json::to_string_pretty(self)?;
         std::fs::write(path, json)?;
         Ok(())
-    }
-
-    pub(crate) fn get_entry(&self, rel_path: &str) -> Option<&CacheEntry> {
-        self.entries.get(rel_path)
-    }
-
-    pub(crate) fn insert(&mut self, rel_path: &str, entry: CacheEntry) {
-        self.entries.insert(rel_path.to_string(), entry);
     }
 
     pub(crate) fn prune(&mut self, markdown_dir: &Path) {

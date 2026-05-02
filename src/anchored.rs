@@ -1,5 +1,4 @@
 use crate::syntex::{highlight_code, latex_to_mathml};
-use anyhow::Error;
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
 
@@ -9,7 +8,6 @@ pub(crate) struct AnchoredIterator<'a, I: Iterator<Item = Event<'a>>> {
     code: Option<CowStr<'a>>,
     footnote: Option<CowStr<'a>>,
     heading: Head<'a>,
-    pub(crate) error: Option<Error>,
 }
 
 #[derive(Default)]
@@ -28,7 +26,6 @@ impl<'a, I: Iterator<Item = Event<'a>>> AnchoredIterator<'a, I> {
             code: None,
             footnote: None,
             heading: Head::Inactive,
-            error: None,
         }
     }
 }
@@ -38,25 +35,19 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Head::Emitting(h_events, h_level) = &mut self.heading {
-            match h_events.pop() {
-                Some(Event::InlineMath(ref latex)) => {
-                    match latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline) {
-                        Ok(res) => Some(Event::InlineHtml(CowStr::from(res))),
-                        Err(err) => {
-                            self.error = Some(err);
-                            None
-                        }
-                    }
-                }
+            Some(match h_events.pop() {
+                Some(Event::InlineMath(ref latex)) => Event::InlineHtml(CowStr::from(
+                    latex_to_mathml(latex, &mut self.storage, DisplayMode::Inline).unwrap(),
+                )),
 
-                Some(event) => Some(event),
+                Some(event) => event,
 
                 None => {
                     let event = Event::Html(CowStr::from(format!("</a></{h_level}>")));
                     self.heading = Head::Inactive;
-                    Some(event)
+                    event
                 }
-            }
+            })
         } else {
             match self.inner.next()? {
                 // -- Code --
@@ -75,24 +66,14 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
                 }
 
                 // -- Math --
-                Event::DisplayMath(latex) => {
-                    match latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block) {
-                        Ok(str) => Some(Event::Html(CowStr::from(str))),
-                        Err(err) => {
-                            self.error = Some(err);
-                            None
-                        }
-                    }
-                }
+                Event::DisplayMath(latex) => Some(Event::Html(CowStr::from(
+                    latex_to_mathml(&latex, &mut self.storage, DisplayMode::Block).unwrap(),
+                ))),
 
                 Event::InlineMath(latex) if let Head::Inactive = self.heading => {
-                    match latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline) {
-                        Ok(str) => Some(Event::InlineHtml(CowStr::from(str))),
-                        Err(err) => {
-                            self.error = Some(err);
-                            None
-                        }
-                    }
+                    Some(Event::InlineHtml(CowStr::from(
+                        latex_to_mathml(&latex, &mut self.storage, DisplayMode::Inline).unwrap(),
+                    )))
                 }
 
                 // -- Footnotes --

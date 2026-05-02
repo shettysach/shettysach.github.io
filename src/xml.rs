@@ -13,7 +13,7 @@ pub(crate) struct Entry {
     pub(crate) rel_url: String,
 }
 
-pub(crate) fn generate_feed(entries: &[Entry], path: &Path) -> Result<()> {
+pub(crate) fn generate_atom_feed(entries: &[Entry], path: &Path) -> Result<()> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
     writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
