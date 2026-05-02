@@ -222,7 +222,7 @@ use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
 pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
         .source(code)
-        .lang(match tag {
+        .language(match tag {
             "rust" | "rs" => Language::Rust,
             "python" | "py" => Language::Python,
             "latex" | "tex" => Language::LaTeX,

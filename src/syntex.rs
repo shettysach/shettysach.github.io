@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lumis::{HtmlLinkedBuilder, languages::Language};
+use lumis::{HtmlLinkedBuilder, highlight, languages::Language};
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, MetadataBlockKind, Options, Parser, Tag, TagEnd,
 };
@@ -101,7 +101,7 @@ pub(crate) fn latex_to_mathml(
 
 pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
     let formatter = HtmlLinkedBuilder::new()
-        .lang(match tag {
+        .language(match tag {
             "rust" | "rs" => Language::Rust,
             "python" | "py" => Language::Python,
             "latex" | "tex" => Language::LaTeX,
@@ -111,7 +111,7 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
         })
         .build()?;
 
-    Ok(lumis::highlight(code, formatter))
+    Ok(highlight(code, formatter))
 }
 
 pub(crate) fn process_metadata(parser: &mut Parser) -> Option<Yaml> {

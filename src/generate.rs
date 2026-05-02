@@ -2,6 +2,7 @@ use crate::{
     anchored::AnchoredIterator,
     cache::{CacheEntry, MetadataCache},
     syntex::{CustomIterator, OPTIONS, process_metadata},
+    utils::{html_escape, slugify},
     xml::{Entry, generate_atom_feed, generate_sitemap},
 };
 use anyhow::{Result, anyhow};
@@ -9,35 +10,44 @@ use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     io::{BufWriter, Write},
-    path::Path,
+    path::{Path, PathBuf},
     time::SystemTime,
 };
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
+const EXPECT: [&str; 5] = [
+    "index.html",
+    "articles.html",
+    "tags.html",
+    "atom.xml",
+    "sitemap.xml",
+];
 
 pub(crate) fn generate_site(
-    markdown_dir: &Path,
-    html_dir: &Path,
+    input_dir: &Path,
+    output_dir: &Path,
     cache: &mut MetadataCache,
 ) -> Result<()> {
-    generate_index(markdown_dir, html_dir, cache)?;
+    generate_index(input_dir, output_dir, cache)?;
 
-    let (labels, entries, tags_map) = collect_articles(markdown_dir, html_dir, cache)?;
+    let mut expected = HashSet::from_iter(EXPECT.into_iter().map(|f| output_dir.join(f)));
+    let (labels, entries, tags_map) =
+        collect_articles(input_dir, output_dir, cache, &mut expected)?;
 
-    generate_articles_page(&labels, html_dir)?;
-    generate_tags_page(&labels, tags_map, html_dir)?;
-    generate_atom_feed(&entries, &html_dir.join("atom.xml"))?;
-    generate_sitemap(entries, &html_dir.join("sitemap.xml"))?;
+    generate_articles_page(&labels, output_dir)?;
+    generate_tags_page(&labels, tags_map, output_dir, &mut expected)?;
+    generate_atom_feed(&entries, &output_dir.join("atom.xml"))?;
+    generate_sitemap(entries, &output_dir.join("sitemap.xml"))?;
 
-    Ok(())
+    cleanup_stale(output_dir, expected)
 }
 
-fn generate_index(markdown_dir: &Path, html_dir: &Path, cache: &mut MetadataCache) -> Result<()> {
-    let src_path = markdown_dir.join("index.md");
+fn generate_index(input_dir: &Path, output_dir: &Path, cache: &mut MetadataCache) -> Result<()> {
+    let src_path = input_dir.join("index.md");
     let modified = src_path.metadata()?.modified()?;
 
     if let Some(entry) = cache.entries.get("index.md")
@@ -53,7 +63,7 @@ fn generate_index(markdown_dir: &Path, html_dir: &Path, cache: &mut MetadataCach
         .and_then(Metadata::parse_metadata)
         .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
 
-    let file = fs::File::create(html_dir.join("index.html"))?;
+    let file = fs::File::create(output_dir.join("index.html"))?;
     let mut writer = BufWriter::new(file);
 
     writer.write_all(metadata.generate_header("").as_bytes())?;
@@ -75,27 +85,30 @@ fn generate_index(markdown_dir: &Path, html_dir: &Path, cache: &mut MetadataCach
 }
 
 type TagsMap = HashMap<String, (Vec<usize>, SystemTime)>;
+
 fn collect_articles(
-    markdown_dir: &Path,
-    html_dir: &Path,
+    input_dir: &Path,
+    output_dir: &Path,
     cache: &mut MetadataCache,
+    expected: &mut HashSet<PathBuf>,
 ) -> Result<(Vec<String>, Vec<Entry>, TagsMap)> {
     let mut articles = Vec::new();
     let mut tags_map: TagsMap = HashMap::new();
 
-    let index_path = markdown_dir.join("index.md");
-    for entry in walkdir::WalkDir::new(markdown_dir)
+    let index_path = input_dir.join("index.md");
+    for entry in walkdir::WalkDir::new(input_dir)
         .max_depth(2)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.path() != index_path)
     {
         let src_path = entry.path();
-        let rel_path = src_path.strip_prefix(markdown_dir)?;
-        let dst_path = html_dir.join(rel_path);
+        let rel_path = src_path.strip_prefix(input_dir)?;
+        let dst_path = output_dir.join(rel_path);
 
         if src_path.extension().is_some_and(|ext| ext == "md") {
             let dst_html = dst_path.with_extension("html");
+            expected.insert(dst_html.clone());
             let modified = src_path.metadata()?.modified()?;
             let rel_path_str = rel_path.to_str().ok_or_else(|| anyhow!("Path not UTF8"))?;
             let rel_url = rel_path
@@ -144,10 +157,12 @@ fn collect_articles(
                         label.push_str(", ");
                     }
                     first = false;
+                    let slug = slugify(&tag);
+                    let escaped = html_escape(&tag);
                     label.push_str("<a href=\"");
-                    label.push_str(&tag);
+                    label.push_str(&slug);
                     label.push_str(".html\">");
-                    label.push_str(&tag);
+                    label.push_str(&escaped);
                     label.push_str("</a>");
 
                     tags_map
@@ -241,8 +256,8 @@ fn generate_article(
     Ok(metadata)
 }
 
-fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
-    let file = fs::File::create(html_dir.join("articles.html"))?;
+fn generate_articles_page(labels: &[String], output_dir: &Path) -> Result<()> {
+    let file = fs::File::create(output_dir.join("articles.html"))?;
     let mut writer = BufWriter::new(file);
 
     let header_str = generate_header(
@@ -268,11 +283,16 @@ fn generate_articles_page(labels: &[String], html_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_tags_page(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> Result<()> {
+fn generate_tags_page(
+    labels: &[String],
+    tags_map: TagsMap,
+    output_dir: &Path,
+    expected: &mut HashSet<PathBuf>,
+) -> Result<()> {
     let mut tags: Vec<&String> = tags_map.keys().collect();
     tags.sort();
 
-    let file = fs::File::create(html_dir.join("tags.html"))?;
+    let file = fs::File::create(output_dir.join("tags.html"))?;
     let mut writer = BufWriter::new(file);
 
     let header_str = generate_header(
@@ -286,10 +306,12 @@ fn generate_tags_page(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> 
 
     writer.write_all(b"<ul>\n")?;
     for tag in &tags {
-        writer.write_all(b"<li><a href=\"")?;
-        writer.write_all(tag.as_bytes())?;
-        writer.write_all(b".html\">")?;
-        writer.write_all(tag.as_bytes())?;
+        let slug = slugify(tag);
+        let escaped = html_escape(tag);
+        writer.write_all(br#"<li><a href=""#)?;
+        writer.write_all(slug.as_bytes())?;
+        writer.write_all(br#".html">"#)?;
+        writer.write_all(escaped.as_bytes())?;
         writer.write_all(b"</a></li>\n")?;
     }
     writer.write_all(b"</ul>\n")?;
@@ -300,7 +322,10 @@ fn generate_tags_page(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> 
     // Generate individual tag pages
     for tag in &tags {
         let (indices, src_modified) = &tags_map[*tag];
-        let dst_path = html_dir.join(format!("{tag}.html"));
+        let slug = slugify(tag);
+        let escaped = html_escape(tag);
+        let dst_path = output_dir.join(&slug).with_extension("html");
+        expected.insert(dst_path.clone());
 
         if dst_path.exists() && dst_path.metadata()?.modified()? > *src_modified {
             continue;
@@ -310,14 +335,14 @@ fn generate_tags_page(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> 
         let mut writer = BufWriter::new(file);
 
         let header_str = generate_header(
-            tag,
-            &format!("Articles tagged {tag}"),
-            &format!("blog, blogpost, {tag}"),
-            &format!("{tag}.html"),
+            &escaped,
+            &format!("Articles tagged {escaped}"),
+            &format!("blog, blogpost, {escaped}"),
+            &format!("{slug}.html"),
         );
         writer.write_all(header_str.as_bytes())?;
         writer.write_all(b"<h1>")?;
-        writer.write_all(tag.as_bytes())?;
+        writer.write_all(escaped.as_bytes())?;
         writer.write_all(b"</h1><hr>")?;
 
         writer.write_all(b"<ul>\n")?;
@@ -330,6 +355,21 @@ fn generate_tags_page(labels: &[String], tags_map: TagsMap, html_dir: &Path) -> 
 
         writer.write_all(FOOTER.as_bytes())?;
         writer.flush()?;
+    }
+
+    Ok(())
+}
+
+fn cleanup_stale(output_dir: &Path, expected: HashSet<PathBuf>) -> Result<()> {
+    for entry in walkdir::WalkDir::new(output_dir).into_iter().flatten() {
+        let path = entry.path();
+        let ext = path.extension().and_then(|e| e.to_str());
+        if ext != Some("html") && ext != Some("xml") {
+            continue;
+        }
+        if !expected.contains(path) {
+            fs::remove_file(path)?
+        }
     }
 
     Ok(())

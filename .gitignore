@@ -1,8 +1,8 @@
 /target
 /_site
 /result
-/tmp
 .direnv
+cache.json
 
 perf.data*
 flamegraph.svg

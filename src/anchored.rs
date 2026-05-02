@@ -113,7 +113,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
                 {
                     let id: String = id
                         .map(|s| s.into_string())
-                        .unwrap_or_else(|| slugify(&h_events));
+                        .unwrap_or_else(|| slugify_h(&h_events));
 
                     h_events.reverse();
                     self.heading = Head::Emitting(h_events, h_level);
@@ -136,7 +136,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
 
 // Slugger
 
-fn slugify(h_events: &[Event]) -> String {
+fn slugify_h(h_events: &[Event]) -> String {
     let mut last_dash = true;
 
     h_events

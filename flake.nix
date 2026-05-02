@@ -76,6 +76,7 @@
               pkgs.miniserve
               pkgs.xmlformat
               pkgs.cargo-flamegraph
+              pkgs.perf
               pkgs.marksman
               pkgs.harper
             ];
