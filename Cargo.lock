@@ -104,6 +104,8 @@ dependencies = [
  "pulldown-cmark",
  "pulldown-latex",
  "quick-xml",
+ "serde",
+ "serde_json",
  "walkdir",
  "yaml-rust2",
 ]

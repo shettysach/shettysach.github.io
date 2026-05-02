@@ -1,0 +1,72 @@
+{
+  "entries": {
+    "nvfp4_gemv/index.md": {
+      "mtime": "2026-04-21T06:58:57.254024077Z",
+      "metadata": {
+        "title": "NVFP4 GEMV",
+        "subtitle": "My submission for the first round of the GPUMODE NVFP4 competition",
+        "tags": [
+          "GPU Kernels",
+          "Optimization",
+          "CuTe DSL",
+          "CUDA"
+        ],
+        "draft": false,
+        "date": "2026-01-10"
+      }
+    },
+    "rendering-math-and-highlighting-code/index.md": {
+      "mtime": "2026-03-06T05:35:37.050235447Z",
+      "metadata": {
+        "title": "Rendering math and highlighting code",
+        "subtitle": "How the blog renders math and highlights syntax, using static HTML and CSS",
+        "tags": [
+          "SSG",
+          "Blog",
+          "Rust",
+          "LaTeX"
+        ],
+        "draft": false,
+        "date": "2025-06-05"
+      }
+    },
+    "projects/index.md": {
+      "mtime": "2026-03-17T19:21:37.594911217Z",
+      "metadata": {
+        "title": "Projects",
+        "subtitle": "A post to display my personal projects",
+        "tags": [
+          "About",
+          "Rust"
+        ],
+        "draft": true,
+        "date": "2025-01-20"
+      }
+    },
+    "index.md": {
+      "mtime": "2026-03-29T00:13:57.202113906Z",
+      "metadata": {
+        "title": "Home",
+        "subtitle": "Welcome to my blog",
+        "tags": null,
+        "draft": false,
+        "date": null
+      }
+    },
+    "linear_and_affine/index.md": {
+      "mtime": "2026-05-02T02:41:28.015382416Z",
+      "metadata": {
+        "title": "Linear and Affine",
+        "subtitle": "In types and transformations",
+        "tags": [
+          "Math",
+          "Type Theory",
+          "Linear Algebra",
+          "Vector Spaces"
+        ],
+        "draft": false,
+        "date": "2026-03-17"
+      }
+    }
+  }
+}
