@@ -32,9 +32,4 @@ impl MetadataCache {
         std::fs::write(path, json)?;
         Ok(())
     }
-
-    pub(crate) fn prune(&mut self, markdown_dir: &Path) {
-        self.entries
-            .retain(|path, _| markdown_dir.join(path).exists());
-    }
 }

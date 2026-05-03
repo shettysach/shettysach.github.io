@@ -5,53 +5,66 @@ use crate::{
     utils::{html_escape, slugify},
     xml::{Entry, generate_atom_feed, generate_sitemap},
 };
-use anyhow::{Result, anyhow};
+use anyhow::{Ok, Result, anyhow};
 use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     fs,
     io::{BufWriter, Write},
-    path::{Path, PathBuf},
+    path::Path,
     time::SystemTime,
 };
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
-const EXPECT: [&str; 5] = [
-    "index.html",
-    "articles.html",
-    "tags.html",
-    "atom.xml",
-    "sitemap.xml",
-];
+
+struct ArticleBuild {
+    metadata: Metadata,
+    datetime: DateTime<Utc>,
+    rel_url: String,
+    modified: SystemTime,
+}
 
 pub(crate) fn generate_site(
     input_dir: &Path,
     output_dir: &Path,
     cache: &mut MetadataCache,
 ) -> Result<()> {
-    generate_index(input_dir, output_dir, cache)?;
+    generate_site_index(input_dir, output_dir, cache)?;
 
-    let mut expected = HashSet::from_iter(EXPECT.into_iter().map(|f| output_dir.join(f)));
-    let (labels, entries, tags_map) =
-        collect_articles(input_dir, output_dir, cache, &mut expected)?;
+    let (articles, article_urls) = process_articles(input_dir, output_dir, cache)?;
+    let (labels, entries, tags_map) = generate_article_pages(articles);
 
-    generate_articles_page(&labels, output_dir)?;
-    generate_tags_page(&labels, tags_map, output_dir, &mut expected)?;
+    generate_articles_index(&labels, &output_dir.join("articles.html"))?;
+    generate_tags_index(&tags_map, &output_dir.join("tags.html"))?;
+
+    let tag_urls = generate_tag_pages(labels, tags_map, output_dir)?;
+
     generate_atom_feed(&entries, &output_dir.join("atom.xml"))?;
     generate_sitemap(entries, &output_dir.join("sitemap.xml"))?;
 
-    cleanup_stale(output_dir, expected)
+    let indexes = ["index.html", "articles.html", "tags.html"];
+    let mut retain = HashSet::with_capacity(indexes.len() + article_urls.len() + tag_urls.len());
+    retain.extend(indexes.map(str::to_string));
+    retain.extend(article_urls);
+    retain.extend(tag_urls);
+
+    cache.entries.retain(|path, _| retain.contains(path)); // Prune
+    cleanup_stale(output_dir, retain)
 }
 
-fn generate_index(input_dir: &Path, output_dir: &Path, cache: &mut MetadataCache) -> Result<()> {
+fn generate_site_index(
+    input_dir: &Path,
+    output_dir: &Path,
+    cache: &mut MetadataCache,
+) -> Result<()> {
     let src_path = input_dir.join("index.md");
-    let modified = src_path.metadata()?.modified()?;
+    let mtime = src_path.metadata()?.modified()?;
 
-    if let Some(entry) = cache.entries.get("index.md")
-        && entry.mtime >= modified
+    if let Some(entry) = cache.entries.get("index.html")
+        && entry.mtime >= mtime
     {
         return Ok(());
     }
@@ -63,43 +76,37 @@ fn generate_index(input_dir: &Path, output_dir: &Path, cache: &mut MetadataCache
         .and_then(Metadata::parse_metadata)
         .ok_or_else(|| anyhow!("YAML Frontmatter error at index.md"))?;
 
-    let file = fs::File::create(output_dir.join("index.html"))?;
-    let mut writer = BufWriter::new(file);
+    let dst_path = output_dir.join("index.html");
+    let mut writer = BufWriter::new(fs::File::create(dst_path)?);
 
     writer.write_all(metadata.generate_header("").as_bytes())?;
-
     write_html_io(&mut writer, parser)?;
-
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    cache.entries.insert(
-        "index.md".to_string(),
-        CacheEntry {
-            mtime: modified,
-            metadata,
-        },
-    );
+    cache
+        .entries
+        .insert("index.html".to_string(), CacheEntry { mtime, metadata });
 
     Ok(())
 }
 
-type TagsMap = HashMap<String, (Vec<usize>, SystemTime)>;
+// NOTE: Replace with Hashmap + Key sort as it scales
+type TagsMap = BTreeMap<String, (Vec<usize>, SystemTime)>;
 
-fn collect_articles(
+fn process_articles(
     input_dir: &Path,
     output_dir: &Path,
     cache: &mut MetadataCache,
-    expected: &mut HashSet<PathBuf>,
-) -> Result<(Vec<String>, Vec<Entry>, TagsMap)> {
+) -> Result<(Vec<ArticleBuild>, Vec<String>)> {
     let mut articles = Vec::new();
-    let mut tags_map: TagsMap = HashMap::new();
+    let mut article_urls = Vec::new();
 
     let index_path = input_dir.join("index.md");
     for entry in walkdir::WalkDir::new(input_dir)
         .max_depth(2)
         .into_iter()
-        .filter_map(Result::ok)
+        .flatten()
         .filter(|e| e.path() != index_path)
     {
         let src_path = entry.path();
@@ -108,17 +115,16 @@ fn collect_articles(
 
         if src_path.extension().is_some_and(|ext| ext == "md") {
             let dst_html = dst_path.with_extension("html");
-            expected.insert(dst_html.clone());
+
             let modified = src_path.metadata()?.modified()?;
-            let rel_path_str = rel_path.to_str().ok_or_else(|| anyhow!("Path not UTF8"))?;
             let rel_url = rel_path
                 .with_extension("html")
                 .to_str()
                 .ok_or_else(|| anyhow!("Path not UTF8"))?
                 .to_string();
 
-            let metadata =
-                generate_article(src_path, &dst_html, modified, &rel_url, rel_path_str, cache)?;
+            let metadata = render_article(src_path, &dst_html, modified, rel_url.clone(), cache)?;
+            article_urls.push(rel_url.clone());
 
             if metadata.draft {
                 continue;
@@ -129,7 +135,12 @@ fn collect_articles(
                 |nd| nd.and_hms_opt(0, 0, 0).unwrap().and_utc(),
             );
 
-            articles.push((metadata, datetime, rel_url, modified));
+            articles.push(ArticleBuild {
+                metadata,
+                datetime,
+                rel_url,
+                modified,
+            });
         } else if src_path.is_dir() {
             if !dst_path.exists() {
                 fs::create_dir(&dst_path)?;
@@ -140,69 +151,83 @@ fn collect_articles(
     }
 
     // Sort by date, newest first
-    articles.sort_by(|a, b| b.1.cmp(&a.1));
+    articles.sort_by(|a, b| b.datetime.cmp(&a.datetime));
+    Ok((articles, article_urls))
+}
+
+fn generate_article_pages(articles: Vec<ArticleBuild>) -> (Vec<String>, Vec<Entry>, TagsMap) {
+    let mut tags_map: TagsMap = BTreeMap::new();
 
     let (labels, entries): (Vec<String>, Vec<Entry>) = articles
         .into_iter()
         .enumerate()
-        .map(|(idx, (metadata, datetime, rel_url, modified))| {
-            let mut label = metadata.label(&rel_url, &datetime);
-
-            if let Some(tags) = metadata.tags {
-                label.push_str(" · ");
-
-                let mut first = true;
-                for tag in tags {
-                    if !first {
-                        label.push_str(", ");
-                    }
-                    first = false;
-                    let slug = slugify(&tag);
-                    let escaped = html_escape(&tag);
-                    label.push_str("<a href=\"");
-                    label.push_str(&slug);
-                    label.push_str(".html\">");
-                    label.push_str(&escaped);
-                    label.push_str("</a>");
-
-                    tags_map
-                        .entry(tag)
-                        .and_modify(|(indices, max_mod)| {
-                            indices.push(idx);
-                            if modified > *max_mod {
-                                *max_mod = modified;
-                            }
-                        })
-                        .or_insert_with(|| (vec![idx], modified));
-                }
-            }
-
-            (
-                label,
-                Entry {
-                    title: metadata.title,
-                    subtitle: metadata.subtitle,
+        .map(
+            |(
+                idx,
+                ArticleBuild {
+                    metadata,
                     datetime,
                     rel_url,
+                    modified,
                 },
-            )
-        })
+            )| {
+                let mut label = metadata.label(&rel_url, &datetime);
+
+                if let Some(tags) = metadata.tags {
+                    label.push_str(" · ");
+
+                    let mut first = true;
+                    for tag in tags {
+                        if !first {
+                            label.push_str(", ");
+                        }
+                        first = false;
+                        let slug = slugify(&tag);
+                        let escaped = html_escape(&tag);
+                        label.push_str("<a href=\"");
+                        label.push_str(&slug);
+                        label.push_str(".html\">");
+                        label.push_str(&escaped);
+                        label.push_str("</a>");
+
+                        tags_map
+                            .entry(tag)
+                            .and_modify(|(indices, max_mod)| {
+                                indices.push(idx);
+                                if modified > *max_mod {
+                                    *max_mod = modified;
+                                }
+                            })
+                            .or_insert_with(|| (vec![idx], modified));
+                    }
+                }
+
+                (
+                    label,
+                    Entry {
+                        title: metadata.title,
+                        subtitle: metadata.subtitle,
+                        datetime,
+                        rel_url,
+                    },
+                )
+            },
+        )
         .unzip();
 
-    Ok((labels, entries, tags_map))
+    (labels, entries, tags_map)
 }
 
-fn generate_article(
+fn render_article(
     src: &Path,
     dst: &Path,
-    modified: SystemTime,
-    rel_url: &str,
-    rel_path: &str,
+    mtime: SystemTime,
+    rel_url: String,
     cache: &mut MetadataCache,
 ) -> Result<Metadata> {
     // Cache hit. No change article, no need to render.
-    if let Some(entry) = cache.entries.get(rel_path)
-        && entry.mtime >= modified
+    if let Some(entry) = cache.entries.get(&rel_url)
+        && entry.mtime >= mtime
     {
         return Ok(entry.metadata.clone());
     }
@@ -218,11 +243,11 @@ fn generate_article(
 
     // Cache miss, but destination HTML is already up-to-date.
     // Skip rendering and repopulate cache for next time.
-    if dst.exists() && dst.metadata()?.modified()? > modified {
+    if dst.exists() && dst.metadata()?.modified()? > mtime {
         cache.entries.insert(
-            rel_path.to_string(),
+            rel_url,
             CacheEntry {
-                mtime: modified,
+                mtime,
                 metadata: metadata.clone(),
             },
         );
@@ -232,7 +257,14 @@ fn generate_article(
     let file = fs::File::create(dst)?;
     let mut writer = BufWriter::new(file);
 
-    writer.write_all(metadata.generate_header(rel_url).as_bytes())?;
+    writer.write_all(metadata.generate_header(&rel_url).as_bytes())?;
+    cache.entries.insert(
+        rel_url,
+        CacheEntry {
+            mtime,
+            metadata: metadata.clone(),
+        },
+    );
 
     let parser = TextMergeStream::new(parser);
     if anchors {
@@ -246,18 +278,11 @@ fn generate_article(
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    cache.entries.insert(
-        rel_path.to_string(),
-        CacheEntry {
-            mtime: modified,
-            metadata: metadata.clone(),
-        },
-    );
     Ok(metadata)
 }
 
-fn generate_articles_page(labels: &[String], output_dir: &Path) -> Result<()> {
-    let file = fs::File::create(output_dir.join("articles.html"))?;
+fn generate_articles_index(labels: &[String], path: &Path) -> Result<()> {
+    let file = fs::File::create(path)?;
     let mut writer = BufWriter::new(file);
 
     let header_str = generate_header(
@@ -277,22 +302,15 @@ fn generate_articles_page(labels: &[String], output_dir: &Path) -> Result<()> {
         writer.write_all(b"</li>\n")?;
     }
     writer.write_all(b"</ul>\n")?;
+
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
     Ok(())
 }
 
-fn generate_tags_page(
-    labels: &[String],
-    tags_map: TagsMap,
-    output_dir: &Path,
-    expected: &mut HashSet<PathBuf>,
-) -> Result<()> {
-    let mut tags: Vec<&String> = tags_map.keys().collect();
-    tags.sort();
-
-    let file = fs::File::create(output_dir.join("tags.html"))?;
+fn generate_tags_index(tags_map: &TagsMap, path: &Path) -> Result<()> {
+    let file = fs::File::create(path)?;
     let mut writer = BufWriter::new(file);
 
     let header_str = generate_header(
@@ -305,13 +323,11 @@ fn generate_tags_page(
     writer.write_all(b"<h1>Tags</h1><hr>")?;
 
     writer.write_all(b"<ul>\n")?;
-    for tag in &tags {
-        let slug = slugify(tag);
-        let escaped = html_escape(tag);
+    for tag in tags_map.keys() {
         writer.write_all(br#"<li><a href=""#)?;
-        writer.write_all(slug.as_bytes())?;
+        writer.write_all(slugify(tag).as_bytes())?;
         writer.write_all(br#".html">"#)?;
-        writer.write_all(escaped.as_bytes())?;
+        writer.write_all(html_escape(tag).as_bytes())?;
         writer.write_all(b"</a></li>\n")?;
     }
     writer.write_all(b"</ul>\n")?;
@@ -319,56 +335,69 @@ fn generate_tags_page(
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
 
-    // Generate individual tag pages
-    for tag in &tags {
-        let (indices, src_modified) = &tags_map[*tag];
-        let slug = slugify(tag);
-        let escaped = html_escape(tag);
-        let dst_path = output_dir.join(&slug).with_extension("html");
-        expected.insert(dst_path.clone());
-
-        if dst_path.exists() && dst_path.metadata()?.modified()? > *src_modified {
-            continue;
-        }
-
-        let file = fs::File::create(dst_path)?;
-        let mut writer = BufWriter::new(file);
-
-        let header_str = generate_header(
-            &escaped,
-            &format!("Articles tagged {escaped}"),
-            &format!("blog, blogpost, {escaped}"),
-            &format!("{slug}.html"),
-        );
-        writer.write_all(header_str.as_bytes())?;
-        writer.write_all(b"<h1>")?;
-        writer.write_all(escaped.as_bytes())?;
-        writer.write_all(b"</h1><hr>")?;
-
-        writer.write_all(b"<ul>\n")?;
-        for &idx in indices {
-            writer.write_all(b"<li>")?;
-            writer.write_all(labels[idx].as_bytes())?;
-            writer.write_all(b"</li>\n")?;
-        }
-        writer.write_all(b"</ul>\n")?;
-
-        writer.write_all(FOOTER.as_bytes())?;
-        writer.flush()?;
-    }
-
     Ok(())
 }
 
-fn cleanup_stale(output_dir: &Path, expected: HashSet<PathBuf>) -> Result<()> {
+fn generate_tag_pages(
+    labels: Vec<String>,
+    tags_map: TagsMap,
+    output_dir: &Path,
+) -> Result<Vec<String>> {
+    tags_map
+        .into_iter()
+        .map(|(tag, (indices, src_modified))| {
+            let slug = slugify(&tag);
+            let escaped = html_escape(&tag);
+            let tag_url = format!("{slug}.html");
+            let dst_path = output_dir.join(&tag_url);
+
+            if dst_path.try_exists()? && dst_path.metadata()?.modified()? > src_modified {
+                return Ok(tag_url);
+            }
+
+            let file = fs::File::create(&dst_path)?;
+            let mut writer = BufWriter::new(file);
+
+            let header_str = generate_header(
+                &escaped,
+                &format!("Articles tagged {escaped}"),
+                &format!("blog, blogpost, {escaped}"),
+                &tag_url,
+            );
+
+            writer.write_all(header_str.as_bytes())?;
+            writer.write_all(b"<h1>")?;
+            writer.write_all(escaped.as_bytes())?;
+            writer.write_all(b"</h1><hr>")?;
+
+            writer.write_all(b"<ul>\n")?;
+            for idx in indices {
+                writer.write_all(b"<li>")?;
+                writer.write_all(labels[idx].as_bytes())?;
+                writer.write_all(b"</li>\n")?;
+            }
+            writer.write_all(b"</ul>\n")?;
+
+            writer.write_all(FOOTER.as_bytes())?;
+            writer.flush()?;
+
+            Ok(tag_url)
+        })
+        .collect()
+}
+
+fn cleanup_stale(output_dir: &Path, expected: HashSet<String>) -> Result<()> {
     for entry in walkdir::WalkDir::new(output_dir).into_iter().flatten() {
         let path = entry.path();
         let ext = path.extension().and_then(|e| e.to_str());
-        if ext != Some("html") && ext != Some("xml") {
-            continue;
-        }
-        if !expected.contains(path) {
-            fs::remove_file(path)?
+        if ext == Some("html") {
+            let rel = path
+                .strip_prefix(output_dir)?
+                .to_str()
+                .ok_or_else(|| anyhow!("Path not UTF8"))?;
+            if !expected.contains(rel) {
+                fs::remove_file(path)?
+            }
         }
     }
 

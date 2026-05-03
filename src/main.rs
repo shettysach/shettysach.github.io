@@ -22,8 +22,8 @@ fn main() -> Result<()> {
 
     let mut cache = cache::MetadataCache::load(cache_path);
     generate::generate_site(input_dir, output_dir, &mut cache)?;
-    cache.prune(input_dir);
     cache.save(cache_path)?;
+
     utils::copy_directory(static_dir, output_dir)?;
 
     Ok(())
