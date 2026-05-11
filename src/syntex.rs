@@ -111,6 +111,7 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
         })
         .build()?;
 
+    let code = code.strip_suffix('\n').unwrap_or(code);
     Ok(highlight(code, formatter))
 }
 
