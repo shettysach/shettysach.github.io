@@ -1,6 +1,7 @@
 use crate::syntex::{highlight_code, latex_to_mathml};
 use pulldown_cmark::{CodeBlockKind, CowStr, Event, HeadingLevel, Tag, TagEnd};
 use pulldown_latex::{Storage, config::DisplayMode};
+use smallvec::SmallVec;
 
 pub(crate) struct AnchoredIterator<'a, I: Iterator<Item = Event<'a>>> {
     inner: I,
@@ -10,12 +11,18 @@ pub(crate) struct AnchoredIterator<'a, I: Iterator<Item = Event<'a>>> {
     heading: Head<'a>,
 }
 
+const AVG_EVENTS: usize = 3;
+
 #[derive(Default)]
 pub(crate) enum Head<'a> {
     #[default]
     Inactive,
-    Capturing(Vec<Event<'a>>, HeadingLevel, Option<CowStr<'a>>),
-    Emitting(Vec<Event<'a>>, HeadingLevel),
+    Capturing(
+        SmallVec<[Event<'a>; AVG_EVENTS]>,
+        HeadingLevel,
+        Option<CowStr<'a>>,
+    ),
+    Emitting(SmallVec<[Event<'a>; AVG_EVENTS]>, HeadingLevel),
 }
 
 impl<'a, I: Iterator<Item = Event<'a>>> AnchoredIterator<'a, I> {
@@ -103,7 +110,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for AnchoredIterator<'a, I> {
 
                 // -- Anchors
                 Event::Start(Tag::Heading { level, id, .. }) => {
-                    self.heading = Head::Capturing(Vec::with_capacity(1), level, id);
+                    self.heading = Head::Capturing(SmallVec::with_capacity(1), level, id);
                     self.next()
                 }
 

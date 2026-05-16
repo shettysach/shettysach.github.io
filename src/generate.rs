@@ -9,6 +9,7 @@ use anyhow::{Ok, Result, anyhow};
 use chrono::{DateTime, NaiveDate, Utc};
 use pulldown_cmark::{Parser, TextMergeStream, html::write_html_io};
 use serde::{Deserialize, Serialize};
+use smallvec::{SmallVec, smallvec};
 use std::{
     collections::{BTreeMap, HashSet},
     fs,
@@ -16,9 +17,26 @@ use std::{
     path::Path,
     time::SystemTime,
 };
+use walkdir::WalkDir;
 
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
+
+// NOTE: Change as it scales
+const TAGS_PER_ARTICLE: usize = 4;
+const ARTICLES_PER_TAG: usize = 2;
+
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct Metadata {
+    pub(crate) title: String,
+    pub(crate) subtitle: Option<String>,
+    pub(crate) tags: Option<SmallVec<[String; TAGS_PER_ARTICLE]>>,
+    pub(crate) draft: bool,
+    pub(crate) date: Option<NaiveDate>,
+}
+
+// NOTE: Replace with Hashmap + Key sort as it scales
+type TagsMap = BTreeMap<String, (SmallVec<[usize; ARTICLES_PER_TAG]>, SystemTime)>;
 
 struct ArticleBuild {
     metadata: Metadata,
@@ -34,22 +52,36 @@ pub(crate) fn generate_site(
 ) -> Result<()> {
     generate_site_index(input_dir, output_dir, cache)?;
 
-    let (articles, article_urls) = process_articles(input_dir, output_dir, cache)?;
+    let (articles, tracked_paths) = process_articles(input_dir, output_dir, cache)?;
     let (labels, entries, tags_map) = generate_article_pages(articles);
-
     generate_articles_index(&labels, &output_dir.join("articles.html"))?;
     generate_tags_index(&tags_map, &output_dir.join("tags.html"))?;
-
-    let tag_urls = generate_tag_pages(labels, tags_map, output_dir)?;
-
+    let tag_paths = generate_tag_pages(labels, tags_map, output_dir)?;
     generate_atom_feed(&entries, &output_dir.join("atom.xml"))?;
     generate_sitemap(entries, &output_dir.join("sitemap.xml"))?;
 
     let indexes = ["index.html", "articles.html", "tags.html"];
-    let mut retain = HashSet::with_capacity(indexes.len() + article_urls.len() + tag_urls.len());
+    let feeds = ["atom.xml", "sitemap.xml"];
+    let statics = [
+        "favicon.ico",
+        "llms.txt",
+        "preview.jpg",
+        "robots.txt",
+        "styles.css",
+        "tokyonight_day.css",
+        "tokyonight_night.css",
+        "google4df97f25ec131b90.html",
+        "03_gemv.html",
+    ];
+
+    let mut retain = HashSet::with_capacity(
+        indexes.len() + feeds.len() + statics.len() + tracked_paths.len() + tag_paths.len(),
+    );
     retain.extend(indexes.map(str::to_string));
-    retain.extend(article_urls);
-    retain.extend(tag_urls);
+    retain.extend(feeds.map(str::to_string));
+    retain.extend(statics.map(str::to_string));
+    retain.extend(tracked_paths);
+    retain.extend(tag_paths);
 
     cache.entries.retain(|path, _| retain.contains(path)); // Prune
     cleanup_stale(output_dir, retain)
@@ -91,16 +123,13 @@ fn generate_site_index(
     Ok(())
 }
 
-// NOTE: Replace with Hashmap + Key sort as it scales
-type TagsMap = BTreeMap<String, (Vec<usize>, SystemTime)>;
-
 fn process_articles(
     input_dir: &Path,
     output_dir: &Path,
     cache: &mut MetadataCache,
 ) -> Result<(Vec<ArticleBuild>, Vec<String>)> {
     let mut articles = Vec::new();
-    let mut article_urls = Vec::new();
+    let mut tracked = Vec::new();
 
     let index_path = input_dir.join("index.md");
     for entry in walkdir::WalkDir::new(input_dir)
@@ -120,11 +149,11 @@ fn process_articles(
             let rel_url = rel_path
                 .with_extension("html")
                 .to_str()
-                .ok_or_else(|| anyhow!("Path not UTF8"))?
+                .ok_or_else(|| anyhow!("Article path not UTF8"))?
                 .to_string();
 
             let metadata = render_article(src_path, &dst_html, modified, rel_url.clone(), cache)?;
-            article_urls.push(rel_url.clone());
+            tracked.push(rel_url.clone());
 
             if metadata.draft {
                 continue;
@@ -145,14 +174,26 @@ fn process_articles(
             if !dst_path.exists() {
                 fs::create_dir(&dst_path)?;
             }
+            tracked.push(
+                rel_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("Dir path not UTF8"))?
+                    .to_string(),
+            );
         } else {
             fs::copy(src_path, dst_path)?;
+            tracked.push(
+                rel_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("File path not UTF8"))?
+                    .to_string(),
+            );
         }
     }
 
     // Sort by date, newest first
     articles.sort_by(|a, b| b.datetime.cmp(&a.datetime));
-    Ok((articles, article_urls))
+    Ok((articles, tracked))
 }
 
 fn generate_article_pages(articles: Vec<ArticleBuild>) -> (Vec<String>, Vec<Entry>, TagsMap) {
@@ -198,7 +239,7 @@ fn generate_article_pages(articles: Vec<ArticleBuild>) -> (Vec<String>, Vec<Entr
                                     *max_mod = modified;
                                 }
                             })
-                            .or_insert_with(|| (vec![idx], modified));
+                            .or_insert_with(|| (smallvec![idx], modified));
                     }
                 }
 
@@ -387,16 +428,23 @@ fn generate_tag_pages(
 }
 
 fn cleanup_stale(output_dir: &Path, expected: HashSet<String>) -> Result<()> {
-    for entry in walkdir::WalkDir::new(output_dir).into_iter().flatten() {
+    for entry in WalkDir::new(output_dir)
+        .contents_first(true)
+        .into_iter()
+        .flatten()
+    {
         let path = entry.path();
-        let ext = path.extension().and_then(|e| e.to_str());
-        if ext == Some("html") {
-            let rel = path
-                .strip_prefix(output_dir)?
-                .to_str()
-                .ok_or_else(|| anyhow!("Path not UTF8"))?;
-            if !expected.contains(rel) {
-                fs::remove_file(path)?
+        let rel = path
+            .strip_prefix(output_dir)?
+            .to_str()
+            .ok_or_else(|| anyhow!("Path not UTF8"))?
+            .to_string();
+
+        if !rel.is_empty() && !expected.contains(&rel) {
+            if path.is_file() {
+                fs::remove_file(path)?;
+            } else if path.is_dir() {
+                fs::remove_dir(path)?;
             }
         }
     }
@@ -410,15 +458,6 @@ fn generate_header(title: &str, description: &str, tags: &str, url: &str) -> Str
         .replace("{{DESCRIPTION}}", description)
         .replace("{{TAGS}}", tags)
         .replace("{{URL}}", url)
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub(crate) struct Metadata {
-    pub(crate) title: String,
-    pub(crate) subtitle: Option<String>,
-    pub(crate) tags: Option<Vec<String>>,
-    pub(crate) draft: bool,
-    pub(crate) date: Option<NaiveDate>,
 }
 
 impl Metadata {
