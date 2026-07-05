@@ -1,9 +1,8 @@
 #![feature(if_let_guard)]
 
-mod anchored;
 mod cache;
 mod generate;
-mod syntex;
+mod iter;
 mod utils;
 mod xml;
 

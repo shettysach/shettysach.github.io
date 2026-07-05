@@ -1,7 +1,6 @@
 use crate::{
-    anchored::AnchoredIterator,
     cache::{CacheEntry, MetadataCache},
-    syntex::{CustomIterator, OPTIONS, process_metadata},
+    iter::{CustomIterator, OPTIONS, process_metadata},
     utils::{html_escape, slugify},
     xml::{Entry, generate_atom_feed, generate_sitemap},
 };
@@ -59,32 +58,7 @@ pub(crate) fn generate_site(
     let tag_paths = generate_tag_pages(labels, tags_map, output_dir)?;
     generate_atom_feed(&entries, &output_dir.join("atom.xml"))?;
     generate_sitemap(entries, &output_dir.join("sitemap.xml"))?;
-
-    let indexes = ["index.html", "articles.html", "tags.html"];
-    let feeds = ["atom.xml", "sitemap.xml"];
-    let statics = [
-        "favicon.ico",
-        "llms.txt",
-        "preview.jpg",
-        "robots.txt",
-        "styles.css",
-        "tokyonight_day.css",
-        "tokyonight_night.css",
-        "google4df97f25ec131b90.html",
-        "03_gemv.html",
-    ];
-
-    let mut retain = HashSet::with_capacity(
-        indexes.len() + feeds.len() + statics.len() + tracked_paths.len() + tag_paths.len(),
-    );
-    retain.extend(indexes.map(str::to_string));
-    retain.extend(feeds.map(str::to_string));
-    retain.extend(statics.map(str::to_string));
-    retain.extend(tracked_paths);
-    retain.extend(tag_paths);
-
-    cache.entries.retain(|path, _| retain.contains(path)); // Prune
-    cleanup_stale(output_dir, retain)
+    cleanup(output_dir, cache, tracked_paths, tag_paths)
 }
 
 fn generate_site_index(
@@ -235,9 +209,7 @@ fn generate_article_pages(articles: Vec<ArticleBuild>) -> (Vec<String>, Vec<Entr
                             .entry(tag)
                             .and_modify(|(indices, max_mod)| {
                                 indices.push(idx);
-                                if modified > *max_mod {
-                                    *max_mod = modified;
-                                }
+                                *max_mod = (*max_mod).max(modified);
                             })
                             .or_insert_with(|| (smallvec![idx], modified));
                     }
@@ -278,7 +250,6 @@ fn render_article(
 
     let doc = process_metadata(&mut parser)
         .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.display()))?;
-    let anchors = doc["anchors"].as_bool().unwrap_or(false);
     let metadata = Metadata::parse_metadata(doc)
         .ok_or_else(|| anyhow!("YAML Frontmatter error {}", src.display()))?;
 
@@ -307,14 +278,8 @@ fn render_article(
         },
     );
 
-    let parser = TextMergeStream::new(parser);
-    if anchors {
-        let parser = AnchoredIterator::new(parser);
-        write_html_io(&mut writer, parser)?;
-    } else {
-        let parser = CustomIterator::new(parser);
-        write_html_io(&mut writer, parser)?;
-    }
+    let parser = CustomIterator::new(TextMergeStream::new(parser));
+    write_html_io(&mut writer, parser)?;
 
     writer.write_all(FOOTER.as_bytes())?;
     writer.flush()?;
@@ -425,6 +390,39 @@ fn generate_tag_pages(
             Ok(tag_url)
         })
         .collect()
+}
+
+fn cleanup(
+    output_dir: &Path,
+    cache: &mut MetadataCache,
+    tracked_paths: Vec<String>,
+    tag_paths: Vec<String>,
+) -> Result<()> {
+    let indexes = ["index.html", "articles.html", "tags.html"];
+    let feeds = ["atom.xml", "sitemap.xml"];
+    let statics = [
+        "favicon.ico",
+        "llms.txt",
+        "preview.jpg",
+        "robots.txt",
+        "styles.css",
+        "tokyonight_day.css",
+        "tokyonight_night.css",
+        "google4df97f25ec131b90.html",
+        "03_gemv.html",
+    ];
+
+    let mut retain = HashSet::with_capacity(
+        indexes.len() + feeds.len() + statics.len() + tracked_paths.len() + tag_paths.len(),
+    );
+    retain.extend(indexes.map(str::to_string));
+    retain.extend(feeds.map(str::to_string));
+    retain.extend(statics.map(str::to_string));
+    retain.extend(tracked_paths);
+    retain.extend(tag_paths);
+
+    cache.entries.retain(|path, _| retain.contains(path)); // Prune
+    cleanup_stale(output_dir, retain)
 }
 
 fn cleanup_stale(output_dir: &Path, expected: HashSet<String>) -> Result<()> {
