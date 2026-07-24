@@ -3,7 +3,6 @@ title: NVFP4 GEMV
 subtitle: My submission for the first round of the GPUMODE NVFP4 competition
 date: 2026-01-10
 tags: [ GPU Kernels, Optimization, CuTe DSL, CUDA ]
-anchors: true
 ---
 
 # NVFP4 GEMV

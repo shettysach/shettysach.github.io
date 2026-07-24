@@ -54,8 +54,10 @@ pub(crate) fn generate_site(
     let (articles, tracked_paths) = process_articles(input_dir, output_dir, cache)?;
     let (labels, entries, tags_map) = generate_article_pages(articles);
     generate_articles_index(&labels, &output_dir.join("articles.html"))?;
+
     generate_tags_index(&tags_map, &output_dir.join("tags.html"))?;
     let tag_paths = generate_tag_pages(labels, tags_map, output_dir)?;
+
     generate_atom_feed(&entries, &output_dir.join("atom.xml"))?;
     generate_sitemap(entries, &output_dir.join("sitemap.xml"))?;
     cleanup(output_dir, cache, tracked_paths, tag_paths)
@@ -401,15 +403,14 @@ fn cleanup(
     let indexes = ["index.html", "articles.html", "tags.html"];
     let feeds = ["atom.xml", "sitemap.xml"];
     let statics = [
-        "favicon.ico",
-        "llms.txt",
-        "preview.jpg",
-        "robots.txt",
         "styles.css",
         "tokyonight_day.css",
         "tokyonight_night.css",
+        "favicon.ico",
+        "preview.jpg",
+        "llms.txt",
+        "robots.txt",
         "google4df97f25ec131b90.html",
-        "03_gemv.html",
     ];
 
     let mut retain = HashSet::with_capacity(
