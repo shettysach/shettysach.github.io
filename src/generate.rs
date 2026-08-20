@@ -21,7 +21,7 @@ use walkdir::WalkDir;
 const HEADER: &str = include_str!("../layout/header.html");
 const FOOTER: &str = include_str!("../layout/footer.html");
 
-// NOTE: Change as it scales
+// FIXME: Change as it scales
 const TAGS_PER_ARTICLE: usize = 4;
 const ARTICLES_PER_TAG: usize = 2;
 
@@ -34,7 +34,7 @@ pub(crate) struct Metadata {
     pub(crate) date: Option<NaiveDate>,
 }
 
-// NOTE: Replace with Hashmap + Key sort as it scales
+// FIXME: Replace with Hashmap + Key sort as it scales
 type TagsMap = BTreeMap<String, (SmallVec<[usize; ARTICLES_PER_TAG]>, SystemTime)>;
 
 struct ArticleBuild {
