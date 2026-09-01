@@ -7,7 +7,7 @@ subtitle: Welcome to my blog
 
 ---
 
-Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers, programming language compilers and robotics. I am also interested in learning about deep learning, information theory, functional programming and type theory. I use Rust, Python, C++ and C. I'm currently a graduate research assistant at the [Dynamic Robotics and Control Laboratory (DRCL)](https://sites.usc.edu/quann/).
+Hi, I'm Sachith, a Master's student in Computer Science at USC, with interests in systems programming, deep learning compilers, programming language compilers and robotics. I am also interested in learning about deep learning, information theory, functional programming and type theory. I use Rust, Python, C++ and C. I'm currently a graduate student researcher at the [Dynamic Robotics and Control Laboratory (DRCL)](https://sites.usc.edu/quann/).
 
 ## Links
 
