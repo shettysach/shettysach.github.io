@@ -81,7 +81,7 @@ MathML representation of the above equation:
 
 To convert from LaTeX to MathML, pulldown-cmark events are used to identify math sections. When the `pulldown_cmark::Parser` parses the markdown file, it detects the tags for both inline (`$`) and block (`$$`) math expressions. Then, the LaTeX inside these sections is converted to MathML using the [`pulldown-latex`](https://crates.io/crates/pulldown-latex) crate. The resultant MathML is streamed and the math is rendered.
 
-### Relevant code
+### Implementation
 
 These are the relevant events we deal with -
 
@@ -177,7 +177,7 @@ Generated HTML with style classes for the above code:
 </div></code></pre>
 ```
 
-### Relevant code
+### Implementation
 
 These are the relevant events we deal with -
 
@@ -214,7 +214,7 @@ impl<'a, I: Iterator<Item = Event<'a>>> Iterator for CustomIterator<'a, I> {
 }
 ```
 
-Code highlighting with `lumis` [^3]
+Code highlighting with [`lumis`](https://crates.io/crates/autumnus)
 
 ```rust
 use autumnus::{HtmlLinkedBuilder, formatter::Formatter, languages::Language};
@@ -244,5 +244,3 @@ pub(crate) fn highlight_code(code: &str, tag: &str) -> Result<String> {
 [^1]: From [The LaTeX Project](https://www.latex-project.org/).
 
 [^2]: From the [MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/MathML).
-
-[^3]: Formerly known as [Autumnus](https://crates.io/crates/autumnus).

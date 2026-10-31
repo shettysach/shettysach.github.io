@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.98"
-lumis = { version = "0.9.0", default-features = false, features = [
+lumis = { version = "0.19.0", default-features = false, features = [
   "lang-haskell",
   "lang-html",
   "lang-latex",
@@ -13,13 +13,13 @@ lumis = { version = "0.9.0", default-features = false, features = [
   "lang-rust"
 ] }
 pulldown-cmark = "0.13.1"
-pulldown-latex = "0.7.1"
-quick-xml = "0.31"
+pulldown-latex = "0.8.0"
+quick-xml = "0.42"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 smallvec = { version = "1.15.1", features = ["serde"] }
 walkdir = "2.5.0"
-yaml-rust2 = "0.10.3"
+yaml-rust2 = "0.13"
 
 [dependencies.chrono]
 version = "0.4"

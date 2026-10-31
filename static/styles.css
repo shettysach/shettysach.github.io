@@ -115,7 +115,7 @@ details > summary {
 
 footer {
     background: var(--auxillary-bg);
-    color: var(--color-slate-200);
+    color: var(--color-slate-400);
     text-align: center;
     padding: 1rem;
 }
