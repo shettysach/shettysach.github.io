@@ -363,9 +363,9 @@ header nav ul li {
     footer,
     main {
         padding: 0rem 1rem;
-        overflow-wrap: anywhere;
-        word-break: break-word; /* fallback/help for some engines */
-        hyphens: auto; /* optional, nicer breaks for prose */
+        overflow-wrap: break-word;
+        word-break: normal;
+        hyphens: none;
     }
 
     header,
