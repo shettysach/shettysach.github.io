@@ -482,9 +482,7 @@ impl Metadata {
             label.push_str("<br>");
         }
 
-        label.push_str("<small class=\"article-date\">");
         label.push_str(&date.format("%b %d, %Y").to_string());
-        label.push_str("</small>");
 
         label
     }

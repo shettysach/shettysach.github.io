@@ -63,7 +63,7 @@ body {
 
 main {
     flex: 1;
-    padding: 0% 20%;
+    padding: 0% 25%;
     position: sticky;
     line-height: 1.5;
 }
@@ -72,7 +72,7 @@ header {
     font-family: "Work Sans", sans-serif;
     background: var(--auxillary-bg);
     color: var(--color-slate-200);
-    padding: 1rem 20%;
+    padding: 1rem 25%;
     z-index: 1000;
 
     position: sticky;
@@ -102,19 +102,11 @@ details {
     padding: 0.5rem;
 }
 details > summary {
-    list-style: none;
     color: var(--color-sky-400);
     cursor: pointer;
-}
-summary::-webkit-details-marker {
-    display: none;
-}
-summary::before {
-    content: "►";
-    padding-right: 0.5rem;
-}
-details[open] summary:before {
-    content: "▼";
+    list-style-position: outside;
+    margin-left: 1em;
+    padding-left: 0.5rem;
 }
 
 .toc {
@@ -286,11 +278,6 @@ li {
 
 a:hover {
     text-decoration: underline;
-}
-
-.article-date {
-    font-family: "Lora", serif;
-    font-style: italic;
 }
 
 .header-link {
