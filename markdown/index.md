@@ -16,7 +16,7 @@ This is my personal website where I write about things I'm building and learning
 
 ## Links
 
-[Email ↗](mailto:shettysachith47@gmail.com) · 
-[GitHub ↗](https://www.github.com/shettysach) · 
-[Twitter/X ↗](https://x.com/shettysach_) · 
-[LinkedIn ↗](https://www.linkedin.com/in/sachithshetty314/)
+[Email](mailto:shettysachith47@gmail.com) · 
+[GitHub](https://www.github.com/shettysach) · 
+[Twitter/X](https://x.com/shettysach_) · 
+[LinkedIn](https://www.linkedin.com/in/sachithshetty314/)
