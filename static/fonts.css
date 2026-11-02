@@ -1,0 +1,47 @@
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/font/jetbrains-mono.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: italic;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/font/jetbrains-mono-italic.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Lora';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/font/lora.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Lora';
+    font-style: italic;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/font/lora-italic.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Work Sans';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/font/work-sans.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Work Sans';
+    font-style: italic;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/font/work-sans-italic.ttf') format('truetype');
+}
