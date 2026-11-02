@@ -35,12 +35,15 @@ pub(crate) fn slugify(text: &str) -> String {
 }
 
 pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
-    for entry in WalkDir::new(src).max_depth(1).into_iter().flatten() {
+    for entry in WalkDir::new(src).max_depth(2) {
+        let entry = entry?;
         let source = entry.path();
         let rel_path = source.strip_prefix(src)?;
         let target = dst.join(rel_path);
 
-        if entry.file_type().is_file()
+        if entry.file_type().is_dir() {
+            fs::create_dir_all(&target)?;
+        } else if entry.file_type().is_file()
             && (!target.exists()
                 || entry.metadata()?.modified()? > target.metadata()?.modified()?)
         {
