@@ -43,13 +43,17 @@ pub(crate) fn copy_directory(src: &Path, dst: &Path) -> Result<()> {
 
         if entry.file_type().is_dir() {
             fs::create_dir_all(&target)?;
-        } else if entry.file_type().is_file()
-            && (!target.exists()
-                || entry.metadata()?.modified()? > target.metadata()?.modified()?)
-        {
-            fs::copy(source, &target)?;
+        } else if entry.file_type().is_file() {
+            copy_if_newer(source, &target)?;
         }
     }
 
+    Ok(())
+}
+
+pub(crate) fn copy_if_newer(src: &Path, dst: &Path) -> Result<()> {
+    if !dst.exists() || src.metadata()?.modified()? > dst.metadata()?.modified()? {
+        fs::copy(src, dst)?;
+    }
     Ok(())
 }

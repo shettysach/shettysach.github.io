@@ -20,28 +20,10 @@ The blog contains articles on various technical topics including:
 
 ## Markdown
 
-You can find the Markdown source of the pages by querying githubusercontent.com. 
-For eg - The source of `https://shettysach.github.io/index.html`, can be found at `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/index.md`
+Markdown source files are available alongside their rendered HTML pages. Replace
+the `.html` extension with `.md` to access the source:
 
-### Steps
+- https://shettysach.github.io/index.html → https://shettysach.github.io/index.md
+- https://shettysach.github.io/linear_and_affine/index.html → https://shettysach.github.io/linear_and_affine/index.md
 
-- Stem the link, removing `https://shettysach.github.io/`.
-```
-https://shettysach.github.io/index.html -> index.html 
-```
-
-- Remove the `.html` extension, and add the `.md` extension. 
-```
-index.html -> index.md 
-```
-
-- Append to `https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/` and request.
-```
-index.md -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/index.md 
-```
-
-The same applies to pages within subdirectories, eg -
-
-```
- https://shettysach.github.io/projects/index.html -> https://raw.githubusercontent.com/shettysach/shettysach.github.io/refs/heads/main/markdown/projects/index.md 
-```
+Generated pages, such as the article and tag indexes, do not have Markdown sources.

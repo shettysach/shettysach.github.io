@@ -1,7 +1,7 @@
 use crate::{
     cache::{CacheEntry, MetadataCache},
     iter::{CustomIterator, OPTIONS, process_metadata},
-    utils::{html_escape, slugify},
+    utils::{copy_if_newer, html_escape, slugify},
     xml::{Entry, generate_atom_feed, generate_sitemap},
 };
 use anyhow::{Ok, Result, anyhow};
@@ -69,6 +69,8 @@ fn generate_site_index(
     cache: &mut MetadataCache,
 ) -> Result<()> {
     let src_path = input_dir.join("index.md");
+    copy_if_newer(&src_path, &output_dir.join("index.md"))?;
+
     let mtime = src_path.metadata()?.modified()?;
 
     if let Some(entry) = cache.entries.get("index.html")
@@ -119,6 +121,13 @@ fn process_articles(
         let dst_path = output_dir.join(rel_path);
 
         if src_path.extension().is_some_and(|ext| ext == "md") {
+            copy_if_newer(src_path, &dst_path)?;
+            tracked.push(
+                rel_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("Article path not UTF8"))?
+                    .to_string(),
+            );
             let dst_html = dst_path.with_extension("html");
 
             let modified = src_path.metadata()?.modified()?;
@@ -157,7 +166,7 @@ fn process_articles(
                     .to_string(),
             );
         } else {
-            fs::copy(src_path, dst_path)?;
+            copy_if_newer(src_path, &dst_path)?;
             tracked.push(
                 rel_path
                     .to_str()
@@ -400,7 +409,7 @@ fn cleanup(
     tracked_paths: Vec<String>,
     tag_paths: Vec<String>,
 ) -> Result<()> {
-    let indexes = ["index.html", "articles.html", "tags.html"];
+    let indexes = ["index.md", "index.html", "articles.html", "tags.html"];
     let feeds = ["atom.xml", "sitemap.xml"];
     let statics = [
         "styles.css",
