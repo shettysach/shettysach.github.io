@@ -84,7 +84,7 @@ atom|entry > atom|id, atom|entry > atom|summary, sitemap|loc { display: block; }
 atom|entry > atom|id, sitemap|loc { color: var(--heading); }
 atom|entry > atom|summary { margin-top: 0.5rem; }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-device-width: 768px) {
     atom|feed, sitemap|urlset {
         padding: 1rem;
     }
