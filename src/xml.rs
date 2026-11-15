@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use quick_xml::{
-    events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event},
+    events::{BytesDecl, BytesEnd, BytesPI, BytesStart, BytesText, Event},
     writer::Writer,
 };
 use std::{fs, path::Path};
@@ -17,6 +17,9 @@ pub(crate) fn generate_atom_feed(entries: &[Entry], path: &Path) -> Result<()> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
     writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
+    writer.write_event(Event::PI(BytesPI::new(
+        r#"xml-stylesheet type="text/css" href="/xml.css""#,
+    )))?;
 
     let mut feed_start = BytesStart::new("feed");
     feed_start.push_attribute(("xmlns", "http://www.w3.org/2005/Atom"));
@@ -37,7 +40,7 @@ pub(crate) fn generate_atom_feed(entries: &[Entry], path: &Path) -> Result<()> {
 
     // title
     writer.write_event(Event::Start(BytesStart::new("title")))?;
-    writer.write_event(Event::Text(BytesText::new("Sachith's Blog")))?;
+    writer.write_event(Event::Text(BytesText::new("Sachith's blog")))?;
     writer.write_event(Event::End(BytesEnd::new("title")))?;
 
     // id
@@ -111,6 +114,9 @@ pub(crate) fn generate_sitemap(entries: Vec<Entry>, path: &Path) -> Result<()> {
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 2);
 
     writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
+    writer.write_event(Event::PI(BytesPI::new(
+        r#"xml-stylesheet type="text/css" href="/xml.css""#,
+    )))?;
 
     let mut urlset_start = BytesStart::new("urlset");
     urlset_start.push_attribute(("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9"));

@@ -1,0 +1,93 @@
+@import url("/fonts.css");
+
+@namespace atom url("http://www.w3.org/2005/Atom");
+@namespace sitemap url("http://www.sitemaps.org/schemas/sitemap/0.9");
+
+:root {
+    color-scheme: light dark;
+    --background: #1a1b26;
+    --surface: #1e2030;
+    --text: #c0caf5;
+    --muted: #a9b1d6;
+    --heading: #7dcfff;
+    --border: #414868;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --background: #f7f7ff;
+        --surface: #eff3ff;
+        --text: #343b58;
+        --muted: #40434f;
+        --heading: #3760bf;
+        --border: #c4c8da;
+    }
+}
+
+atom|feed, sitemap|urlset {
+    display: block;
+    box-sizing: border-box;
+    min-height: 100vh;
+    padding: 2rem max(1rem, 25%);
+    background: var(--background);
+    color: var(--text);
+    font: 1rem/1.5 "Work Sans", sans-serif;
+    overflow-wrap: anywhere;
+}
+
+atom|feed::before, sitemap|urlset::before {
+    display: block;
+    margin-bottom: 1rem;
+    color: var(--heading);
+    font: 2rem/1.25 "Lora", serif;
+}
+
+atom|feed::before { content: "Atom feed"; }
+sitemap|urlset::before { content: "Sitemap"; }
+
+atom|feed > atom|title {
+    display: block;
+    margin-bottom: 1rem;
+    font: 1.25rem "Lora", serif;
+}
+
+atom|feed > atom|title::after {
+    content: " — Subscribe to this feed in your feed reader to follow new articles.";
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--muted);
+    font: 1rem/1.5 "Work Sans", sans-serif;
+}
+
+atom|feed > atom|author, atom|feed > atom|id, atom|feed > atom|link,
+atom|feed > atom|updated, atom|entry > atom|link, sitemap|priority {
+    display: none;
+}
+
+atom|entry, sitemap|url {
+    display: block;
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+atom|entry > atom|title {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--heading);
+    font: 1.4rem/1.3 "Lora", serif;
+}
+
+atom|entry > atom|updated, sitemap|lastmod {
+    display: block;
+    margin: 0.4rem 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+atom|entry > atom|updated::before { content: "Updated: "; }
+sitemap|lastmod::before { content: "Last modified: "; }
+atom|entry > atom|id, atom|entry > atom|summary, sitemap|loc { display: block; }
+atom|entry > atom|id, sitemap|loc { color: var(--heading); }
+atom|entry > atom|summary { margin-top: 0.5rem; }
