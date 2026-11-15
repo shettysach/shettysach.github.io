@@ -51,14 +51,6 @@ atom|feed > atom|title {
     font: 1.25rem "Lora", serif;
 }
 
-atom|feed > atom|title::after {
-    content: " — Subscribe to this feed in your feed reader to follow new articles.";
-    display: block;
-    margin-top: 0.5rem;
-    color: var(--muted);
-    font: 1rem/1.5 "Work Sans", sans-serif;
-}
-
 atom|feed > atom|author, atom|feed > atom|id, atom|feed > atom|link,
 atom|feed > atom|updated, atom|entry > atom|link, sitemap|priority {
     display: none;
